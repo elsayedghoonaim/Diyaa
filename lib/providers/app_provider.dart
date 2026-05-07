@@ -114,8 +114,12 @@ class AppProvider extends ChangeNotifier {
 
   AppProvider() {
     _initBadges();
-    _loadPreferences();
-    _loadPrayerTimes();
+    _init();
+  }
+
+  Future<void> _init() async {
+    await _loadPreferences();
+    await _loadPrayerTimes();
   }
 
   void _initBadges() {
@@ -183,7 +187,7 @@ class AppProvider extends ChangeNotifier {
     _darkMode   = prefs.getBool(_kDarkModeKey)   ?? false;
     _arabicMode = prefs.getBool(_kArabicModeKey) ?? false;
     _hijriDates = prefs.getBool(_kHijriDatesKey) ?? true;
-    _useLocation = prefs.getBool('diyaa-use-location') ?? false;
+    _useLocation = prefs.getBool('diyaa-use-location') ?? true;
 
     _notifPrayer = prefs.getBool(_kNotifPrayerKey) ?? true;
     _notifStreak = prefs.getBool(_kNotifStreakKey) ?? true;
@@ -367,7 +371,7 @@ class AppProvider extends ChangeNotifier {
       if (info != null) {
         try {
           await NotificationService.requestPermissions();
-          await NotificationService.scheduleAzkarNotifications(info);
+          await NotificationService.scheduleAzkarNotifications(info, isArabic: _arabicMode);
         } catch (_) {
           // Notification scheduling failed — non-fatal
         }

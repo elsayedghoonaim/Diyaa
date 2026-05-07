@@ -56,47 +56,78 @@ class NotificationService {
         ?.requestExactAlarmsPermission();
   }
 
-  static Future<void> scheduleAzkarNotifications(PrayerInfo prayers) async {
+  static Future<void> scheduleAzkarNotifications(PrayerInfo prayers, {bool isArabic = false}) async {
     // Clear previously scheduled notifications
     await _notificationsPlugin.cancelAll();
 
     final now = DateTime.now();
 
-    // 1. Morning Azkar: 30 minutes after Fajr
-    DateTime morningTime = prayers.fajr.add(const Duration(minutes: 30));
-    if (morningTime.isBefore(now)) {
-      morningTime = morningTime.add(const Duration(days: 1)); // Rough estimate for tomorrow
+    // Helper to ensure we schedule for the future
+    DateTime getFutureTime(DateTime time) {
+      return time.isBefore(now) ? time.add(const Duration(days: 1)) : time;
     }
+
+    // 1. Morning Azkar: 30 minutes after Fajr
     await _scheduleNotification(
       id: 1,
-      title: 'أذكار الصباح',
-      body: 'حان وقت أذكار الصباح. ابدأ يومك بذكر الله.',
-      scheduledDate: morningTime,
+      title: isArabic ? 'أذكار الصباح 🌅' : 'Morning Azkar 🌅',
+      body: isArabic 
+          ? 'ابدأ يومك بنور الذكر. حان وقت أذكار الصباح لتكون في حفظ الله ورعايته.'
+          : 'Start your day with the light of remembrance. Time for your Morning Azkar.',
+      scheduledDate: getFutureTime(prayers.fajr.add(const Duration(minutes: 30))),
     );
 
     // 2. Evening Azkar: 30 minutes after Asr
-    DateTime eveningTime = prayers.asr.add(const Duration(minutes: 30));
-    if (eveningTime.isBefore(now)) {
-      eveningTime = eveningTime.add(const Duration(days: 1));
-    }
     await _scheduleNotification(
       id: 2,
-      title: 'أذكار المساء',
-      body: 'حان وقت أذكار المساء. اختم يومك بذكر الله.',
-      scheduledDate: eveningTime,
+      title: isArabic ? 'أذكار المساء 🌇' : 'Evening Azkar 🌇',
+      body: isArabic
+          ? 'لا تنس أذكار المساء لتكون في حفظ الله حتى تصبح. اجعل ختام يومك ذكراً.'
+          : 'Protect yourself until the morning. It\'s time for your Evening Azkar.',
+      scheduledDate: getFutureTime(prayers.asr.add(const Duration(minutes: 30))),
     );
 
-    // 3. Post-Prayer Dhikr (Dhuhr)
-    DateTime dhuhrDhikrTime = prayers.dhuhr.add(const Duration(minutes: 10));
-    if (dhuhrDhikrTime.isBefore(now)) {
-      dhuhrDhikrTime = dhuhrDhikrTime.add(const Duration(days: 1));
-    }
+    // 3. Sleep Azkar: 30 minutes after Isha
     await _scheduleNotification(
       id: 3,
-      title: 'أذكار بعد الصلاة',
-      body: 'تقبل الله صلاتك. لا تنس أذكار ما بعد صلاة الظهر.',
-      scheduledDate: dhuhrDhikrTime,
+      title: isArabic ? 'أذكار النوم 🌙' : 'Sleep Azkar 🌙',
+      body: isArabic
+          ? 'اختم يومك بذكر الله لتنام في طمأنينة وتحفظك الملائكة حتى تستيقظ.'
+          : 'End your day with the remembrance of Allah for a peaceful night\'s sleep.',
+      scheduledDate: getFutureTime(prayers.isha.add(const Duration(minutes: 30))),
     );
+
+    // 4. Wake up Azkar: 30 minutes before Fajr
+    await _scheduleNotification(
+      id: 4,
+      title: isArabic ? 'قيام الليل والاستيقاظ 🌌' : 'Night/Wake-up Azkar 🌌',
+      body: isArabic
+          ? 'إن ربك ينزل إلى السماء الدنيا في هذا الوقت، فاذكره وادعه يستجب لك.'
+          : 'The last third of the night is a time of immense blessing. Make dua and remember Him.',
+      scheduledDate: getFutureTime(prayers.fajr.subtract(const Duration(minutes: 30))),
+    );
+
+    // 5. Post-Prayer Reminders for all 5 prayers (15 minutes after)
+    final postPrayerMessages = [
+      {'id': 5, 'time': prayers.fajr, 'nameAr': 'الفجر', 'nameEn': 'Fajr'},
+      {'id': 6, 'time': prayers.dhuhr, 'nameAr': 'الظهر', 'nameEn': 'Dhuhr'},
+      {'id': 7, 'time': prayers.asr, 'nameAr': 'العصر', 'nameEn': 'Asr'},
+      {'id': 8, 'time': prayers.maghrib, 'nameAr': 'المغرب', 'nameEn': 'Maghrib'},
+      {'id': 9, 'time': prayers.isha, 'nameAr': 'العشاء', 'nameEn': 'Isha'},
+    ];
+
+    for (var p in postPrayerMessages) {
+      await _scheduleNotification(
+        id: p['id'] as int,
+        title: isArabic 
+            ? 'أذكار ما بعد صلاة ${p['nameAr']} 📿' 
+            : 'Post-${p['nameEn']} Azkar 📿',
+        body: isArabic
+            ? 'تقبل الله صلاتك! لا تنس ختام الصلاة لتكتب لك الحسنات وتغفر الخطايا.'
+            : 'May Allah accept your prayer! Don\'t forget your post-prayer supplications.',
+        scheduledDate: getFutureTime((p['time'] as DateTime).add(const Duration(minutes: 15))),
+      );
+    }
   }
 
   static Future<void> _scheduleNotification({
