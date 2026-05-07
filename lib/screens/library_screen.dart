@@ -279,7 +279,7 @@ class _CategoryTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${category.zikrs.length} ${provider.t('items', 'أذكار')}',
+                        '${provider.toArabicDigits(category.zikrs.length.toString())} ${provider.t('items', 'أذكار')}',
                         style: TextStyle(
                           fontSize: 11,
                           color: textPrimary.withOpacity(0.4),

@@ -443,6 +443,18 @@ class AppProvider extends ChangeNotifier {
   /// Bilingual helper
   String t(String en, String ar) => _arabicMode ? ar : en;
 
+  /// Arabic numbers helper
+  String toArabicDigits(String input) {
+    if (!_arabicMode) return input;
+    const english = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+    const arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+    String res = input;
+    for (int i = 0; i < english.length; i++) {
+      res = res.replaceAll(english[i], arabic[i]);
+    }
+    return res;
+  }
+
   // ── Shop Methods ────────────────────────────────
   Future<bool> purchaseTheme(String themeId, int cost) async {
     if (_totalPoints >= cost && !_unlockedThemes.contains(themeId)) {

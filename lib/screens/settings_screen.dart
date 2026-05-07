@@ -310,7 +310,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 iconColor: gold,
                                 iconBgMode: 'default', // No bg
                                 label: 'Diyaa v1.0.0',
-                                arLabel: 'ضياء v1.0.0',
+                                arLabel: provider.toArabicDigits('ضياء v1.0.0'),
                                 sublabel: t('Made with care for the Ummah', 'صُنع بعناية للأمة الإسلامية'),
                                 rightWidget: const SizedBox.shrink(),
                                 isLast: true,

@@ -287,7 +287,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 _StatPill(
                   icon: Icons.local_fire_department,
-                  value: context.watch<AppProvider>().streak.toString(),
+                  value: context.read<AppProvider>().toArabicDigits(context.read<AppProvider>().streak.toString()),
                   color: gold,
                   cardBg: cardBg,
                   border: border,
@@ -295,7 +295,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 8),
                 _StatPill(
                   icon: Icons.diamond_outlined,
-                  value: _formatNumber(context.watch<AppProvider>().totalPoints),
+                  value: context.read<AppProvider>().toArabicDigits(_formatNumber(context.read<AppProvider>().totalPoints)),
                   color: teal,
                   cardBg: cardBg,
                   border: border,
@@ -987,11 +987,24 @@ class _PrayerCardContentState extends State<_PrayerCardContent> {
     }).toList();
   }
 
+  String _toArabic(String num) {
+    if (!widget.arabic) return num;
+    const english = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+    const arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+    String res = num;
+    for (int i = 0; i < english.length; i++) {
+      res = res.replaceAll(english[i], arabic[i]);
+    }
+    return res;
+  }
+
   @override
   Widget build(BuildContext context) {
     final next = _nextPrayer();
-    final countdown = _countdown();
+    final countdown = _toArabic(_countdown());
     final dots = _prayerDots();
+
+    final nextTime = _toArabic(next.time);
 
     return Column(
       children: [
@@ -1113,7 +1126,7 @@ class _LivePrayerDot extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          prayer.time,
+          arabic ? context.read<AppProvider>().toArabicDigits(prayer.time) : prayer.time,
           style: TextStyle(fontSize: 9, color: Colors.white.withOpacity(0.35), letterSpacing: 0.2),
         ),
       ]),

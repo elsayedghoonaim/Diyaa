@@ -433,53 +433,49 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      // Increased top from 14→24 to push header down slightly
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 10),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: onBack,
-            child: SizedBox(
-              width: 36, height: 36,
-              child: Icon(
-                arabic ? Icons.chevron_right : Icons.chevron_left,
-                size: 26,
-                color: textSec,
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Padding(
+        // Increased top from 14→24 to push header down slightly
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 10),
+        child: Row(
+          children: [
+            GestureDetector(
+              onTap: onBack,
+              child: SizedBox(
+                width: 36, height: 36,
+                child: Icon(
+                  Icons.chevron_left,
+                  size: 26,
+                  color: textSec,
+                ),
               ),
             ),
-          ),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Title: Amiri 24
-                Text(
-                  nameAr,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.amiri(fontSize: 24, color: gold, height: 1.2),
-                ),
-                // Subtitle: 12px
-                if (!arabic)
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Title: Amiri 24
                   Text(
-                    nameEn,
+                    nameAr,
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: textSec, letterSpacing: 0.04),
+                    style: GoogleFonts.amiri(fontSize: 24, color: gold, height: 1.2),
                   ),
-              ],
+                  // Subtitle: 12px
+                  if (!arabic)
+                    Text(
+                      nameEn,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: textSec, letterSpacing: 0.04),
+                    ),
+                ],
+              ),
             ),
-          ),
-          // Circular play button
-          Container(
-            width: 36, height: 36,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: teal, width: 1.5),
-            ),
-            child: Icon(Icons.play_arrow, size: 14, color: teal),
-          ),
-        ],
+            // Empty box to balance the back button and keep title centered
+            const SizedBox(width: 36, height: 36),
+          ],
+        ),
       ),
     );
   }
@@ -507,6 +503,7 @@ class _ProgressBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final prov = context.read<AppProvider>();
     final progress = sessionTotal > 0 ? sessionCurrent / sessionTotal : 0.0;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
@@ -530,11 +527,11 @@ class _ProgressBar extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                t('Zikr ${zikrIdx + 1} of $sessionTotal', 'الذكر ${zikrIdx + 1} من $sessionTotal'),
+                t('Zikr ${zikrIdx + 1} of $sessionTotal', 'الذكر ${prov.toArabicDigits((zikrIdx + 1).toString())} من ${prov.toArabicDigits(sessionTotal.toString())}'),
                 style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: textSec),
               ),
               Text(
-                '$sessionCurrent/$sessionTotal',
+                prov.toArabicDigits('$sessionCurrent/$sessionTotal'),
                 style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: teal),
               ),
             ],
@@ -650,7 +647,7 @@ class _ZikrContent extends StatelessWidget {
               border: Border.all(color: repeatBorderColor, width: 1),
             ),
             child: Text(
-              arabic ? 'كرر ${zikr.repeat} مرة' : 'Repeat ${zikr.repeat}×',
+              arabic ? 'كرر ${context.read<AppProvider>().toArabicDigits(zikr.repeat.toString())} مرة' : 'Repeat ${zikr.repeat}×',
               style: TextStyle(
                 fontSize: 11, fontWeight: FontWeight.w600, color: gold, letterSpacing: 0.04,
               ),
@@ -741,7 +738,7 @@ class _InteractionZone extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              '$count',
+                              context.read<AppProvider>().toArabicDigits('$count'),
                               style: TextStyle(
                                 fontSize: 42, fontWeight: FontWeight.w200,
                                 color: textPrimary, height: 1.0, letterSpacing: -1,
@@ -749,7 +746,7 @@ class _InteractionZone extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '/ ${zikr.repeat}',
+                              context.read<AppProvider>().toArabicDigits('/ ${zikr.repeat}'),
                               style: TextStyle(fontSize: 12, color: textSec),
                             ),
                           ],

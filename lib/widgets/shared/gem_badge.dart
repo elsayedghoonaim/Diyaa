@@ -15,7 +15,8 @@ class GemBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark = context.watch<AppProvider>().darkMode;
+    final provider = context.watch<AppProvider>();
+    final dark = provider.darkMode;
     final gold = dark ? AppColors.accentGoldDark : AppColors.accentGoldLight;
     
     // Background tint is slightly darker in dark mode vs light mode to contrast the gem
@@ -39,7 +40,7 @@ class GemBadge extends StatelessWidget {
           Icon(Icons.diamond_outlined, color: AppColors.accentTealLight, size: iconSize),
           const SizedBox(width: 4),
           Text(
-            _fmt(value),
+            provider.toArabicDigits(_fmt(value)),
             style: TextStyle(
               fontSize: fontSize,
               fontWeight: FontWeight.w600,

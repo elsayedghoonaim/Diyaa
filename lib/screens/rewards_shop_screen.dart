@@ -195,27 +195,13 @@ class _RewardsShopScreenState extends State<RewardsShopScreen> {
                             color: const Color(0xFFD4A84B),
                             borderRadius: BorderRadius.circular(9999),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                provider.t('Get it', 'احصل عليها'),
-                                style: const TextStyle(
-                                  color: Color(0xFF1A1A2E),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              const Text('·', style: TextStyle(color: Color(0xFF1A1A2E), fontWeight: FontWeight.bold)),
-                              const SizedBox(width: 4),
-                              const Icon(Icons.diamond_outlined, size: 14, color: Color(0xFF1A1A2E)),
-                              const SizedBox(width: 2),
-                              const Text(
-                                '2,400',
-                                style: TextStyle(color: Color(0xFF1A1A2E), fontWeight: FontWeight.bold, fontSize: 13),
-                              ),
-                            ],
+                          child: Text(
+                            provider.t('Coming Soon', 'قريباً'),
+                            style: const TextStyle(
+                              color: Color(0xFF1A1A2E),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
                           ),
                         )
                       ],
@@ -364,115 +350,67 @@ class _ThemeCard extends StatelessWidget {
     final teal = dark ? AppColors.accentTealDark : AppColors.accentTealLight;
     final border = dark ? AppColors.borderDark : AppColors.borderLight;
 
-    final isUnlocked = provider.unlockedThemes.contains(theme.id);
-    final isActive = provider.activeTheme == theme.id;
-
-    return GestureDetector(
-      onTap: () async {
-        if (isActive) return;
-        if (isUnlocked) {
-          await provider.applyTheme(theme.id);
-        } else {
-          final success = await provider.purchaseTheme(theme.id, theme.cost);
-          if (!context.mounted) return;
-          if (success) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(provider.t('Theme unlocked!', 'تم فتح السمة!'))));
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(provider.t('Not enough gems.', 'لا تملك جواهر كافية.'))));
-          }
-        }
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: cardBg,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: isActive ? teal : border, width: isActive ? 1.5 : 1.0),
-        ),
-        child: Column(
-          children: [
-            // Top Swatch
-            Container(
-              height: 80,
-              decoration: BoxDecoration(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(17)),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: theme.colors,
-                ),
-              ),
-              child: Stack(
-                children: [
-                  Positioned(
-                    top: 8,
-                    left: arabic ? 8 : null,
-                    right: arabic ? null : 8,
-                    child: isUnlocked
-                        ? Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
-                            child: const Icon(Icons.check, size: 12, color: Colors.green),
-                          )
-                        : Container(),
-                  ),
-                  if (!isUnlocked)
-                    Positioned(
-                      bottom: 8,
-                      left: arabic ? 8 : null,
-                      right: arabic ? null : 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.diamond_outlined, size: 12, color: Colors.white),
-                            const SizedBox(width: 4),
-                            Text(theme.cost.toString(), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
+    return Container(
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: border, width: 1.0),
+      ),
+      child: Column(
+        children: [
+          // Top Swatch
+          Container(
+            height: 80,
+            decoration: BoxDecoration(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(17)),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: theme.colors,
               ),
             ),
-            // Bottom Info
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
+          ),
+          // Bottom Info
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: Text(
                       arabic ? theme.nameAr : theme.nameEn,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: textPrimary,
-                      ),
+                      style: arabic 
+                          ? GoogleFonts.amiri(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: textPrimary,
+                            )
+                          : TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: textPrimary,
+                            ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      isUnlocked 
-                          ? (isActive ? provider.t('Active', 'مفعل') : provider.t('Unlocked', 'مفتوح')) 
-                          : provider.t('Locked', 'مغلق'),
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: isActive ? teal : secondary,
-                        fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                      ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    provider.t('Coming Soon', 'قريباً'),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: teal,
+                      fontWeight: FontWeight.bold,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -490,11 +428,7 @@ class _AudioCard extends StatelessWidget {
     final cardBg = dark ? AppColors.cardBgDark : AppColors.cardBgLight;
     final textPrimary = dark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
     final secondary = dark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
-    final teal = dark ? AppColors.accentTealDark : AppColors.accentTealLight;
     final border = dark ? AppColors.borderDark : AppColors.borderLight;
-
-    final isUnlocked = provider.unlockedAudios.contains(audio.id);
-    final isActive = provider.activeAudio == audio.id;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -509,12 +443,12 @@ class _AudioCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: isActive ? teal.withOpacity(0.1) : (dark ? const Color(0xFF1E2530) : const Color(0xFFF0EDE6)),
+              color: dark ? const Color(0xFF1E2530) : const Color(0xFFF0EDE6),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
-              isUnlocked ? Icons.play_arrow_rounded : Icons.lock_outline_rounded,
-              color: isActive ? teal : secondary,
+              Icons.lock_outline_rounded,
+              color: secondary,
             ),
           ),
           const SizedBox(width: 14),
@@ -524,59 +458,41 @@ class _AudioCard extends StatelessWidget {
               children: [
                 Text(
                   arabic ? audio.nameAr : audio.nameEn,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: textPrimary,
-                  ),
+                  style: arabic
+                      ? GoogleFonts.amiri(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: textPrimary,
+                        )
+                      : TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: textPrimary,
+                        ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   arabic ? audio.descAr : audio.descEn,
-                  style: TextStyle(fontSize: 12, color: secondary),
+                  style: TextStyle(fontSize: 12, color: secondary.withOpacity(0.7)),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 10),
-          GestureDetector(
-            onTap: () async {
-              if (isActive) return;
-              if (isUnlocked) {
-                await provider.applyAudio(audio.id);
-              } else {
-                final success = await provider.purchaseAudio(audio.id, audio.cost);
-                if (!context.mounted) return;
-                if (success) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(provider.t('Audio unlocked!', 'تم فتح الصوت!'))));
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(provider.t('Not enough gems.', 'لا تملك جواهر كافية.'))));
-                }
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: isActive ? teal : (isUnlocked ? Colors.transparent : AppColors.accentGoldLight.withOpacity(0.1)),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: isActive ? teal : (isUnlocked ? border : AppColors.accentGoldLight.withOpacity(0.3))),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: AppColors.accentGoldLight.withOpacity(0.3)),
+            ),
+            child: Text(
+              provider.t('Coming Soon', 'قريباً'),
+              style: TextStyle(
+                color: dark ? AppColors.accentGoldDark : AppColors.accentGoldLight, 
+                fontSize: 12, 
+                fontWeight: FontWeight.bold
               ),
-              child: isActive 
-                ? Text(provider.t('Active', 'مفعل'), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))
-                : (isUnlocked 
-                    ? Text(provider.t('Use', 'استخدم'), style: TextStyle(color: textPrimary, fontSize: 12, fontWeight: FontWeight.w600))
-                    : Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.diamond_outlined, size: 12, color: dark ? AppColors.accentGoldDark : AppColors.accentGoldLight),
-                          const SizedBox(width: 4),
-                          Text(
-                            audio.cost.toString(),
-                            style: TextStyle(color: dark ? AppColors.accentGoldDark : AppColors.accentGoldLight, fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      )
-                  ),
             ),
           ),
         ],

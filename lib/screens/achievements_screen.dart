@@ -45,7 +45,7 @@ class AchievementsScreen extends StatelessWidget {
                     child: Column(
                       children: [
                         Text(
-                          provider.t('Achievements', 'إنجازاتك'),
+                          'الإنجازات',
                           style: GoogleFonts.amiri(
                             fontSize: 30,
                             fontWeight: FontWeight.bold,
@@ -55,7 +55,7 @@ class AchievementsScreen extends StatelessWidget {
                         ),
                         if (!arabic)
                           Text(
-                            'Spiritual Milestones',
+                            'Achievements',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
@@ -156,7 +156,7 @@ class AchievementsScreen extends StatelessWidget {
                             child: Text(
                               provider.t(
                                 'Locked (${provider.lockedBadges.length})',
-                                'مقفل (${provider.lockedBadges.length})',
+                                'مقفل (${_toArabicNumber(provider.lockedBadges.length.toString())})',
                               ),
                               style: TextStyle(fontSize: 12, color: secondary),
                             ),
@@ -274,7 +274,7 @@ class _StreakCard extends StatelessWidget {
               Text(
                 provider.t(
                   '$streak-day streak',
-                  'سلسلة $streak يوم',
+                  'سلسلة ${_toArabicNumber(streak.toString())} يوم',
                 ),
                 style: TextStyle(
                   fontSize: 18,
@@ -449,9 +449,9 @@ class _StatsRow extends StatelessWidget {
     // We count the streak as "days active"
     final days     = provider.streak;
 
-    final ptsStr      = _fmt(pts);
-    final sessionStr  = sessions.toString();
-    final daysStr     = days.toString();
+    final ptsStr      = _fmt(pts, provider.arabicMode);
+    final sessionStr  = provider.arabicMode ? _toArabicNumber(sessions.toString()) : sessions.toString();
+    final daysStr     = provider.arabicMode ? _toArabicNumber(days.toString()) : days.toString();
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
@@ -491,10 +491,11 @@ class _StatsRow extends StatelessWidget {
     );
   }
 
-  static String _fmt(int n) {
-    if (n < 1000) return n.toString();
+  static String _fmt(int n, bool arabic) {
+    if (n < 1000) return arabic ? _toArabicNumber(n.toString()) : n.toString();
     final s = n.toString();
-    return '${s.substring(0, s.length - 3)},${s.substring(s.length - 3)}';
+    final res = '${s.substring(0, s.length - 3)},${s.substring(s.length - 3)}';
+    return arabic ? _toArabicNumber(res) : res;
   }
 }
 
@@ -671,8 +672,8 @@ class _RewardTeaser extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     provider.t(
-                      'Spend your ${_fmt(pts)} PTS on themes & more',
-                      'اصرف ${_fmt(pts)} نقطة على سمات وأكثر',
+                      'Spend your ${_fmt(pts, false)} PTS on themes & more',
+                      'اصرف ${_fmt(pts, true)} نقطة على سمات وأكثر',
                     ),
                     style: TextStyle(fontSize: 13, color: secondary),
                   ),
@@ -686,9 +687,20 @@ class _RewardTeaser extends StatelessWidget {
     );
   }
 
-  static String _fmt(int n) {
-    if (n < 1000) return n.toString();
+  static String _fmt(int n, bool arabic) {
+    if (n < 1000) return arabic ? _toArabicNumber(n.toString()) : n.toString();
     final s = n.toString();
-    return '${s.substring(0, s.length - 3)},${s.substring(s.length - 3)}';
+    final res = '${s.substring(0, s.length - 3)},${s.substring(s.length - 3)}';
+    return arabic ? _toArabicNumber(res) : res;
   }
+}
+
+String _toArabicNumber(String numStr) {
+  const english = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+  const arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+  String res = numStr;
+  for (int i = 0; i < english.length; i++) {
+    res = res.replaceAll(english[i], arabic[i]);
+  }
+  return res;
 }
