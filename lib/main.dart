@@ -10,7 +10,12 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   
-  await NotificationService.initialize();
+  try {
+    await NotificationService.initialize();
+  } catch (_) {
+    // Non-fatal: notifications won't work but app still launches
+    debugPrint('Notification service init failed');
+  }
   
   runApp(
     ChangeNotifierProvider(

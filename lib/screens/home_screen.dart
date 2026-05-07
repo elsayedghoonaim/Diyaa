@@ -240,41 +240,50 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Greeting
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'السلام عليكم',
-                style: GoogleFonts.amiri(
-                  fontSize: 26, color: gold, height: 1.1,
-                ),
-              ),
-              const SizedBox(height: 8), // Increased space from 3 to 8
-              if (!arabic)
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  dateStrEn,
-                  style: TextStyle(
-                    fontSize: 13, // Increased size from 11 to 13
-                    color: secondary, 
-                    letterSpacing: 0.04,
-                    fontWeight: FontWeight.w500,
-                  ),
-                )
-              else
-                Text(
-                  dateStrAr,
+                  'السلام عليكم',
                   style: GoogleFonts.amiri(
-                    fontSize: 15, // Increased size from 12 to 15
-                    color: secondary,
+                    fontSize: 26, color: gold, height: 1.1,
                   ),
                 ),
-            ],
+                const SizedBox(height: 8),
+                if (!arabic)
+                  Text(
+                    dateStrEn,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: secondary, 
+                      letterSpacing: 0.04,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  )
+                else
+                  Text(
+                    dateStrAr,
+                    style: GoogleFonts.amiri(
+                      fontSize: 15,
+                      color: secondary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
           ),
+
+          const SizedBox(width: 8),
 
           // Stat pills
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 _StatPill(
                   icon: Icons.local_fire_department,

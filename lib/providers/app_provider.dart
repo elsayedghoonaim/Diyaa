@@ -357,17 +357,27 @@ class AppProvider extends ChangeNotifier {
   Future<void> _loadPrayerTimes() async {
     _prayerLoading = true;
     notifyListeners();
-    final info = await PrayerTimesService.loadTodaysPrayers(useLocation: _useLocation);
-    _prayerInfo = info;
-    _suggested  = info != null ? PrayerTimesService.suggest(info) : SuggestedSession.morning;
-    _prayerLoading = false;
 
-    if (info != null) {
-      await NotificationService.requestPermissions();
-      await NotificationService.scheduleAzkarNotifications(info);
+    try {
+      final info = await PrayerTimesService.loadTodaysPrayers(useLocation: _useLocation)
+          .timeout(const Duration(seconds: 15), onTimeout: () => null);
+      _prayerInfo = info;
+      _suggested  = info != null ? PrayerTimesService.suggest(info) : SuggestedSession.morning;
+
+      if (info != null) {
+        try {
+          await NotificationService.requestPermissions();
+          await NotificationService.scheduleAzkarNotifications(info);
+        } catch (_) {
+          // Notification scheduling failed — non-fatal
+        }
+      }
+    } catch (_) {
+      _suggested = SuggestedSession.morning;
+    } finally {
+      _prayerLoading = false;
+      notifyListeners();
     }
-
-    notifyListeners();
   }
 
   Future<void> refreshPrayerTimes() => _loadPrayerTimes();
