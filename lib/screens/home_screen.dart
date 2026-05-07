@@ -748,12 +748,31 @@ class _SessionCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      arabic ? session.descAr : session.descEn,
-                      style: arabic
-                          ? GoogleFonts.amiri(
-                              fontSize: 14, color: secondary, height: 1.4)
-                          : TextStyle(fontSize: 14, color: secondary),
+                    Builder(
+                      builder: (context) {
+                        if (dynamicState == 'done') {
+                          final phrases = [
+                            (en: "May Allah Accept 🤍", ar: "تقبل الله 🤍"),
+                            (en: "Alhamdulillah 🌟", ar: "الحمد لله 🌟"),
+                            (en: "Reward Written 📜", ar: "كُتب الأجر 📜"),
+                          ];
+                          // Use sessionId hash to pick a consistent phrase for this session
+                          final idx = session.jsonId.hashCode % phrases.length;
+                          final p = phrases[idx];
+                          return Text(
+                            arabic ? p.ar : p.en,
+                            style: arabic
+                                ? GoogleFonts.amiri(fontSize: 14, color: gold, fontWeight: FontWeight.bold)
+                                : TextStyle(fontSize: 14, color: gold, fontWeight: FontWeight.bold),
+                          );
+                        }
+                        return Text(
+                          arabic ? session.descAr : session.descEn,
+                          style: arabic
+                              ? GoogleFonts.amiri(fontSize: 14, color: secondary, height: 1.4)
+                              : TextStyle(fontSize: 14, color: secondary),
+                        );
+                      }
                     ),
                     if (isActive) ...[
                       const SizedBox(height: 8),

@@ -213,9 +213,16 @@ class _ZikrScreenState extends State<ZikrScreen> {
                 zikrs: parsedZikrs,
               );
               if (mounted) {
+                final provider = context.read<AppProvider>();
+                final savedIdx = provider.getSavedZikrIndex(widget.sessionId);
+                final savedCounts = provider.getSavedZikrCounts(widget.sessionId);
+                
                 setState(() {
                   _session = session;
-                  _counts = List.filled(parsedZikrs.length, 0);
+                  _zikrIdx = (savedIdx < parsedZikrs.length) ? savedIdx : 0;
+                  _counts = (savedCounts != null && savedCounts.length == parsedZikrs.length) 
+                      ? List.from(savedCounts) 
+                      : List.filled(parsedZikrs.length, 0);
                   _loading = false;
                 });
               }
@@ -250,9 +257,16 @@ class _ZikrScreenState extends State<ZikrScreen> {
         );
         
         if (mounted) {
+          final provider = context.read<AppProvider>();
+          final savedIdx = provider.getSavedZikrIndex(widget.sessionId);
+          final savedCounts = provider.getSavedZikrCounts(widget.sessionId);
+
           setState(() {
             _session = session;
-            _counts = List.filled(session.zikrs.length, 0);
+            _zikrIdx = (savedIdx < session.zikrs.length) ? savedIdx : 0;
+            _counts = (savedCounts != null && savedCounts.length == session.zikrs.length)
+                ? List.from(savedCounts)
+                : List.filled(session.zikrs.length, 0);
             _loading = false;
           });
         }
@@ -282,6 +296,11 @@ class _ZikrScreenState extends State<ZikrScreen> {
     );
   }
 
+  void _saveProgress() {
+    if (_session == null) return;
+    context.read<AppProvider>().saveZikrProgress(widget.sessionId, _zikrIdx, _counts);
+  }
+
   void _increment() {
     if (_session == null) return;
     
@@ -304,8 +323,10 @@ class _ZikrScreenState extends State<ZikrScreen> {
         } else {
           // All zikrs completed! Trigger celebration
           _completeSession();
+          return; // Don't save progress after completion (it will be cleared)
         }
       }
+      _saveProgress();
     });
   }
 
@@ -313,6 +334,7 @@ class _ZikrScreenState extends State<ZikrScreen> {
     if (_session == null) return;
     final provider = context.read<AppProvider>();
     provider.completeSession(widget.sessionId);
+    provider.clearSessionProgress(widget.sessionId);
 
     final sessionNameEn = _getEnglishCategoryName(_session!.nameAr);
 
@@ -333,15 +355,24 @@ class _ZikrScreenState extends State<ZikrScreen> {
   }
 
   void _goPrev() {
-    if (_zikrIdx > 0) setState(() { _zikrIdx--; });
+    if (_zikrIdx > 0) setState(() { 
+      _zikrIdx--; 
+      _saveProgress();
+    });
   }
 
   void _goNext() {
     if (_session == null) return;
-    if (_zikrIdx < _session!.zikrs.length - 1) setState(() { _zikrIdx++; });
+    if (_zikrIdx < _session!.zikrs.length - 1) setState(() { 
+      _zikrIdx++; 
+      _saveProgress();
+    });
   }
 
-  void _goToIndex(int i) => setState(() { _zikrIdx = i; });
+  void _goToIndex(int i) => setState(() { 
+    _zikrIdx = i; 
+    _saveProgress();
+  });
 
   @override
   Widget build(BuildContext context) {

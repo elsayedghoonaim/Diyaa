@@ -256,15 +256,22 @@ class AppProvider extends ChangeNotifier {
       // New day — check streak
       _handleDayRollover(prefs, lastReset, today);
       _completedSessionsToday = {};
+      
+      // Clear all active session progress on new day
+      final resetProgressKeys = prefs.getKeys().where((k) => k.startsWith('$_kSessionProgressIndexKey-') || k.startsWith('$_kSessionProgressCountsKey-'));
+      for (final key in resetProgressKeys) {
+        await prefs.remove(key);
+      }
+      _sessionProgressIndex = {};
+      _sessionProgressCounts = {};
+
       await prefs.setStringList(_kCompletedSessionsKey, []);
       await prefs.setString(_kLastResetKey, today);
     } else {
       _completedSessionsToday = (prefs.getStringList(_kCompletedSessionsKey) ?? []).toSet();
     }
 
-    // Load session progress
-    _sessionProgressIndex = {};
-    _sessionProgressCounts = {};
+    // Load session progress if not just reset
     final progressKeys = prefs.getKeys().where((k) => k.startsWith('$_kSessionProgressIndexKey-'));
     for (final key in progressKeys) {
       final sessionId = key.replaceFirst('$_kSessionProgressIndexKey-', '');
@@ -384,12 +391,13 @@ class AppProvider extends ChangeNotifier {
     }
 
     if (_morningStreak >= 7)  unlock('early_riser');
+    if (_morningStreak >= 30) unlock('morning_light');
     if (_streak >= 7)         unlock('devoted');
     if (_totalSessions >= 100) unlock('century');
     if (_totalPoints >= 1000) unlock('gem_collector');
 
-    // All 5 sessions today
-    const allSessions = {'morning', 'wake_up', 'post_prayer', 'evening', 'sleep'};
+    // All 5 core sessions today
+    const allSessions = {'morning', 'evening', 'sleep', 'wakeup', 'cat_7'};
     if (_completedSessionsToday.containsAll(allSessions)) unlock('fortress');
 
     if (changed) {
