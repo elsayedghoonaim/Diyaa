@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'providers/app_provider.dart';
 import 'services/notification_service.dart';
 import 'theme/app_colors.dart';
+import 'screens/onboarding_screen.dart';
 import 'screens/main_screen.dart';
 
 void main() async {
@@ -54,7 +55,9 @@ class DiyaaApp extends StatelessWidget {
         useMaterial3: true,
       ),
       themeMode: provider.darkMode ? ThemeMode.dark : ThemeMode.light,
-      home: MainScreen(key: MainScreen.mainKey),
+      home: provider.onboardingComplete 
+          ? MainScreen(key: MainScreen.mainKey) 
+          : const OnboardingScreen(),
     );
   }
 }

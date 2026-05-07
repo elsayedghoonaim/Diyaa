@@ -19,6 +19,9 @@ const String _kUnlockedThemesKey      = 'diyaa-unlocked-themes';
 const String _kUnlockedAudiosKey      = 'diyaa-unlocked-audios';
 const String _kActiveThemeKey         = 'diyaa-active-theme';
 const String _kActiveAudioKey         = 'diyaa-active-audio';
+const String _kOnboardingCompleteKey  = 'diyaa-onboarding-complete';
+const String _kSessionProgressIndexKey = 'diyaa-session-progress-index';
+const String _kSessionProgressCountsKey = 'diyaa-session-progress-counts';
 
 // Settings Keys
 const String _kNotifPrayerKey         = 'diyaa-notif-prayer';
@@ -60,6 +63,11 @@ class AppProvider extends ChangeNotifier {
   bool _notifStreak = true;
   bool _notifMilestone = true;
   bool _soundEnabled = true;
+  bool _onboardingComplete = false;
+
+  // Session progress persistence
+  Map<String, int> _sessionProgressIndex = {};
+  Map<String, List<int>> _sessionProgressCounts = {};
 
   // Progress tracking
   Set<String> _completedSessionsToday = {};
@@ -93,6 +101,7 @@ class AppProvider extends ChangeNotifier {
   bool get notifStreak            => _notifStreak;
   bool get notifMilestone         => _notifMilestone;
   bool get soundEnabled           => _soundEnabled;
+  bool get onboardingComplete     => _onboardingComplete;
 
   Set<String> get completedSessionsToday => _completedSessionsToday;
   int get totalPoints             => _totalPoints;
@@ -188,6 +197,7 @@ class AppProvider extends ChangeNotifier {
     _arabicMode = prefs.getBool(_kArabicModeKey) ?? false;
     _hijriDates = prefs.getBool(_kHijriDatesKey) ?? true;
     _useLocation = prefs.getBool('diyaa-use-location') ?? true;
+    _onboardingComplete = prefs.getBool(_kOnboardingCompleteKey) ?? false;
 
     _notifPrayer = prefs.getBool(_kNotifPrayerKey) ?? true;
     _notifStreak = prefs.getBool(_kNotifStreakKey) ?? true;
@@ -232,6 +242,19 @@ class AppProvider extends ChangeNotifier {
       await prefs.setString(_kLastResetKey, today);
     } else {
       _completedSessionsToday = (prefs.getStringList(_kCompletedSessionsKey) ?? []).toSet();
+    }
+
+    // Load session progress
+    _sessionProgressIndex = {};
+    _sessionProgressCounts = {};
+    final progressKeys = prefs.getKeys().where((k) => k.startsWith('$_kSessionProgressIndexKey-'));
+    for (final key in progressKeys) {
+      final sessionId = key.replaceFirst('$_kSessionProgressIndexKey-', '');
+      _sessionProgressIndex[sessionId] = prefs.getInt(key) ?? 0;
+      final countsList = prefs.getStringList('$_kSessionProgressCountsKey-$sessionId');
+      if (countsList != null) {
+        _sessionProgressCounts[sessionId] = countsList.map((e) => int.parse(e)).toList();
+      }
     }
 
     notifyListeners();
@@ -442,6 +465,33 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kSoundEnabledKey, value);
+  }
+
+  Future<void> completeOnboarding() async {
+    _onboardingComplete = true;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kOnboardingCompleteKey, true);
+  }
+
+  // ── Session Progress ──────────────────────────
+  void saveZikrProgress(String sessionId, int index, List<int> counts) async {
+    _sessionProgressIndex[sessionId] = index;
+    _sessionProgressCounts[sessionId] = counts;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('$_kSessionProgressIndexKey-$sessionId', index);
+    await prefs.setStringList('$_kSessionProgressCountsKey-$sessionId', counts.map((e) => e.toString()).toList());
+  }
+
+  int getSavedZikrIndex(String sessionId) => _sessionProgressIndex[sessionId] ?? 0;
+  List<int>? getSavedZikrCounts(String sessionId) => _sessionProgressCounts[sessionId];
+
+  void clearSessionProgress(String sessionId) async {
+    _sessionProgressIndex.remove(sessionId);
+    _sessionProgressCounts.remove(sessionId);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('$_kSessionProgressIndexKey-$sessionId');
+    await prefs.remove('$_kSessionProgressCountsKey-$sessionId');
   }
 
   /// Bilingual helper

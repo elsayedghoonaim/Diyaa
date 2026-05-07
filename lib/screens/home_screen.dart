@@ -219,7 +219,7 @@ class _HomeScreenState extends State<HomeScreen> {
     HijriCalendar.setLocal('en');
     String gregorianEn = DateFormat('EEEE, d MMMM', 'en_US').format(now);
     String hijriEn = '${hijriNow.hDay} ${hijriNow.getLongMonthName()} ${hijriNow.hYear}';
-    String dateStrEn = showHijri ? '$gregorianEn · $hijriEn' : gregorianEn;
+    String dateStrEn = showHijri ? hijriEn : gregorianEn;
     
     // Quick Arabic translation for Gregorian
     final arDays = ['الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'];
@@ -231,7 +231,7 @@ class _HomeScreenState extends State<HomeScreen> {
     
     HijriCalendar.setLocal('ar');
     String hijriAr = '${_toArabicNumber(hijriNow.hDay.toString())} ${hijriNow.getLongMonthName()} ${_toArabicNumber(hijriNow.hYear.toString())}';
-    String dateStrAr = showHijri ? '$gregorianAr · $hijriAr' : gregorianAr;
+    String dateStrAr = showHijri ? hijriAr : gregorianAr;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 52, 24, 12),
@@ -247,7 +247,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Text(
                   'السلام عليكم',
                   style: GoogleFonts.amiri(
-                    fontSize: 26, color: gold, height: 1.1,
+                    fontSize: 32, color: gold, height: 1.1,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -255,7 +255,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Text(
                     dateStrEn,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 16,
                       color: secondary, 
                       letterSpacing: 0.04,
                       fontWeight: FontWeight.w500,
@@ -267,7 +267,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Text(
                     dateStrAr,
                     style: GoogleFonts.amiri(
-                      fontSize: 15,
+                      fontSize: 18,
                       color: secondary,
                     ),
                     maxLines: 1,
@@ -362,7 +362,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Text(
           arabic ? 'جلسات اليوم' : "TODAY'S SESSIONS",
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 14,
             fontWeight: FontWeight.w700,
             letterSpacing: 1.0,
             color: teal,
@@ -617,7 +617,7 @@ class _StatPill extends StatelessWidget {
           Text(
             value,
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 15,
               fontWeight: FontWeight.w700,
               color: color,
               letterSpacing: -0.2,
@@ -717,10 +717,10 @@ class _SessionCard extends StatelessWidget {
                             arabic ? session.nameAr : session.nameEn,
                             style: arabic
                                 ? GoogleFonts.amiri(
-                                    fontSize: 15, fontWeight: FontWeight.w600,
+                                    fontSize: 18, fontWeight: FontWeight.w600,
                                     color: textPrimary, height: 1.3)
                                 : TextStyle(
-                                    fontSize: 15, fontWeight: FontWeight.w600,
+                                    fontSize: 18, fontWeight: FontWeight.w600,
                                     color: textPrimary),
                           ),
                         ),
@@ -752,8 +752,8 @@ class _SessionCard extends StatelessWidget {
                       arabic ? session.descAr : session.descEn,
                       style: arabic
                           ? GoogleFonts.amiri(
-                              fontSize: 12, color: secondary, height: 1.4)
-                          : TextStyle(fontSize: 12, color: secondary),
+                              fontSize: 14, color: secondary, height: 1.4)
+                          : TextStyle(fontSize: 14, color: secondary),
                     ),
                     if (isActive) ...[
                       const SizedBox(height: 8),
@@ -1018,7 +1018,7 @@ class _PrayerCardContentState extends State<_PrayerCardContent> {
                 Text(
                   widget.t('Next Prayer', 'الصلاة القادمة').toUpperCase(),
                   style: TextStyle(
-                    fontSize: 10, fontWeight: FontWeight.w700,
+                    fontSize: 12, fontWeight: FontWeight.w700,
                     letterSpacing: 1.2, color: Colors.white.withOpacity(0.55),
                   ),
                 ),
@@ -1033,7 +1033,7 @@ class _PrayerCardContentState extends State<_PrayerCardContent> {
                   Text(
                     next.nameEn,
                     style: TextStyle(
-                      fontSize: 14, color: Colors.white.withOpacity(0.7),
+                      fontSize: 16, color: Colors.white.withOpacity(0.7),
                       letterSpacing: 0.3,
                     ),
                   ),
@@ -1058,7 +1058,7 @@ class _PrayerCardContentState extends State<_PrayerCardContent> {
                 ),
                 Text(
                   widget.t('h · min', 'ساعة · دقيقة'),
-                  style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.5)),
+                  style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.5)),
                 ),
               ],
             ),
@@ -1119,15 +1119,15 @@ class _LivePrayerDot extends StatelessWidget {
           arabic ? prayer.nameAr : prayer.nameEn,
           textAlign: TextAlign.center,
           style: arabic
-              ? GoogleFonts.amiri(fontSize: 10, color: nameColor,
+              ? GoogleFonts.amiri(fontSize: 12, color: nameColor,
                   fontWeight: isNext ? FontWeight.w700 : FontWeight.w400)
-              : TextStyle(fontSize: 10, color: nameColor,
+              : TextStyle(fontSize: 12, color: nameColor,
                   fontWeight: isNext ? FontWeight.w700 : FontWeight.w400),
         ),
         const SizedBox(height: 2),
         Text(
           arabic ? context.read<AppProvider>().toArabicDigits(prayer.time) : prayer.time,
-          style: TextStyle(fontSize: 9, color: Colors.white.withOpacity(0.35), letterSpacing: 0.2),
+          style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.35), letterSpacing: 0.2),
         ),
       ]),
     );

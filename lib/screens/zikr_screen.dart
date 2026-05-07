@@ -13,10 +13,24 @@ import 'celebration_screen.dart';
 // Models
 // ─────────────────────────────────────────────
 String _getEnglishCategoryName(String arName) {
+  // Normalize by trimming and removing common diacritics that might cause mismatches
+  final normalized = arName.trim()
+    .replaceAll('\u064B', '') // Fathatan
+    .replaceAll('\u064C', '') // Dammatan
+    .replaceAll('\u064D', '') // Kasratan
+    .replaceAll('\u064E', '') // Fatha
+    .replaceAll('\u064F', '') // Damma
+    .replaceAll('\u0650', '') // Kasra
+    .replaceAll('\u0651', '') // Shadda
+    .replaceAll('\u0652', ''); // Sukun
+
   final map = {
     'أذكار الصباح والمساء': 'Morning & Evening Azkar',
+    'أذكار الصباح': 'Morning Azkar',
+    'أذكار المساء': 'Evening Azkar',
     'أذكار النوم': 'Sleep Azkar',
     'أذكار الاستيقاظ من النوم': 'Waking Up Azkar',
+    'أذكار الاستيقاظ': 'Waking Up Azkar',
     'دعاء دخول الخلاء': 'Entering Restroom',
     'دعاء الخروج من الخلاء': 'Leaving Restroom',
     'الذكر قبل الوضوء': 'Before Wudu',
@@ -27,8 +41,8 @@ String _getEnglishCategoryName(String arName) {
     'دعاء دخول المسجد': 'Entering Mosque',
     'دعاء الخروج من المسجد': 'Leaving Mosque',
     'أذكار الآذان': 'Call to Prayer (Azan)',
-    'دعاء ُلبْس الثوب': 'Wearing Clothes',
-    'دعاء ُلبْس الثوب الجديد': 'Wearing New Clothes',
+    'دعاء لبس الثوب': 'Wearing Clothes',
+    'دعاء لبس الثوب الجديد': 'Wearing New Clothes',
     'الدعاء لمن لبس ثوبا جديدا': 'Supplication for New Clothes',
     'ما يقول إذا وضع ثوبه': 'Undressing',
     'دعاء الاستفتاح': 'Opening Supplication',
@@ -41,6 +55,7 @@ String _getEnglishCategoryName(String arName) {
     'الصلاة على النبي بعد التشهد': 'Sending Blessings on Prophet',
     'الدعاء بعد التشهد الأخير قبل السلام': 'Before Tasleem',
     'الأذكار بعد السلام من الصلاة': 'Azkar after Prayer',
+    'أذكار بعد السلام من الصلاة المفروضة': 'Azkar after Obligatory Prayer',
     'دعاء صلاة الاستخارة': 'Istikhara Prayer',
     'دعاء الهم والحزن': 'Anxiety and Sorrow',
     'دعاء الكرب': 'Distress',
@@ -59,8 +74,51 @@ String _getEnglishCategoryName(String arName) {
     'الدعاء إذا نزل المطر': 'When it Rains',
     'الدعاء قبل الطعام': 'Before Eating',
     'الدعاء عند الفراغ من الطعام': 'After Eating',
+    'الدعاء إذا تقلب ليلا': 'Turning Over During the Night',
+    'دعاء الفزع في النوم و من بلي بالوحشة': 'Anxiety During Sleep',
+    'ما يفعل من رأى الرؤيا أو الحلم': 'Seeing a Dream',
+    'دعاء قنوت الوتر': 'Qunut in Witr Prayer',
+    'الذكر عقب السلام من الوتر': 'Remembrance After Witr',
+    'دعاء من أصابه وسوسة في الإيمان': 'Doubt in Faith',
+    'دعاء الوسوسة في الصلاة و القراءة': 'Distraction During Prayer',
+    'ما يقول ويفعل من أذنب ذنبا': 'If You Commit a Sin',
+    'الدعاء حينما يقع ما لا يرضاه أو غلب على أمره': 'When Something Disliked Happens',
+    'تهنئة المولود له وجوابه': 'Congratulating for a Newborn',
+    'ما يعوذ به الأولاد': 'Seeking Protection for Children',
+    'فضل عيادة المريض': 'Excellence of Visiting the Sick',
+    'دعاء المريض الذي يئس من حياته': 'Sick person nearing death',
+    'تلقين المحتضر': 'Prompting the Dying',
+    'دعاء من أصيب بمصيبة': 'In Times of Calamity',
+    'الدعاء عند إغماض الميت': 'Closing the Eyes of the Deceased',
+    'الدعاء للميت في الصلاة عليه': 'Supplication for the Deceased',
+    'الدعاء للفرط في الصلاة عليه': 'Supplication for a Child',
+    'الدعاء عند إدخال الميت القبر': 'Placing the Deceased in the Grave',
+    'دعاء السفر': 'Travel Supplication',
+    'دعاء دخول السوق': 'Entering the Market',
+    'دعاء الركوب': 'Riding Supplication',
+    'ذكر الرجوع من السفر': 'Returning from Travel',
+    'دعاء المسافر للمقيم': 'Traveler to the Resident',
+    'دعاء المقيم للمسافر': 'Resident to the Traveler',
+    'دعاء رؤية الهلال': 'Sighting the Crescent',
+    'الدعاء عند إفطار الصائم': 'Breaking the Fast',
+    'دعاء الضيف لصاحب الطعام': 'Guest to the Host',
+    'كفارة المجلس': 'Expiation of a Meeting',
+    'الدعاء لمن قال بارك الله فيك': 'To someone who says Baraka Allahu Fik',
+    'ما يقوله المسلم إذا زكي': 'If a Muslim is praised',
+    'تلبية الحج أو العمرة': 'Talbiyah for Hajj or Umrah',
   };
-  return map[arName] ?? 'Hisn al-Muslim';
+
+  // Try exact match on normalized name
+  if (map.containsKey(normalized)) return map[normalized]!;
+  
+  // Try partial match for very common ones
+  if (normalized.contains('الصباح')) return 'Morning Azkar';
+  if (normalized.contains('المساء')) return 'Evening Azkar';
+  if (normalized.contains('النوم')) return 'Sleep Azkar';
+  if (normalized.contains('الوضوء')) return 'Wudu Supplication';
+  if (normalized.contains('المسجد')) return 'Mosque Supplication';
+
+  return 'Hisn al-Muslim';
 }
 class ZikrItem {
   final String arabic;
@@ -689,21 +747,23 @@ class _InteractionZone extends StatelessWidget {
     return Padding(
       // top: 8 (tighter), bottom: 20 (was 16→reduced to pull zone up)
       padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Prev / Ring / Next row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _ArrowBtn(
-                icon: arabic ? Icons.chevron_right : Icons.chevron_left,
-                active: canPrev,
-                bg: arrowBg, border: border,
-                color: canPrev ? textSec : progressBg,
-                onTap: canPrev ? onPrev : null,
-              ),
-              const SizedBox(width: 28),
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Prev / Ring / Next row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _ArrowBtn(
+                  icon: Icons.chevron_left,
+                  active: canPrev,
+                  bg: arrowBg, border: border,
+                  color: canPrev ? textSec : progressBg,
+                  onTap: canPrev ? onPrev : null,
+                ),
+                const SizedBox(width: 28),
 
               // Arc ring counter
               GestureDetector(
@@ -759,7 +819,7 @@ class _InteractionZone extends StatelessWidget {
 
               const SizedBox(width: 28),
               _ArrowBtn(
-                icon: arabic ? Icons.chevron_left : Icons.chevron_right,
+                icon: Icons.chevron_right,
                 active: canNext,
                 bg: arrowBg, border: border,
                 color: canNext ? textSec : progressBg,
@@ -801,6 +861,7 @@ class _InteractionZone extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }
