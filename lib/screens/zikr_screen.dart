@@ -601,9 +601,7 @@ class _ZikrContent extends StatelessWidget {
               borderRadius: BorderRadius.circular(9999),
             ),
             child: Text(
-              arabic
-                  ? 'حصن المسلم'
-                  : (zikr.description.isNotEmpty ? zikr.description : sessionNameEn),
+              arabic ? 'حصن المسلم' : 'Hisn al-Muslim',
               style: TextStyle(
                 fontSize: 9,
                 fontWeight: FontWeight.w700,
