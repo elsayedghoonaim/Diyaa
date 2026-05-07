@@ -107,7 +107,29 @@ class NotificationService {
       scheduledDate: getFutureTime(prayers.fajr.subtract(const Duration(minutes: 30))),
     );
 
-    // 5. Post-Prayer Reminders for all 5 prayers (15 minutes after)
+    // 5. Prayer Time Notifications (at the exact time)
+    final prayerTimes = [
+      {'id': 10, 'time': prayers.fajr, 'nameAr': 'الفجر', 'nameEn': 'Fajr'},
+      {'id': 11, 'time': prayers.dhuhr, 'nameAr': 'الظهر', 'nameEn': 'Dhuhr'},
+      {'id': 12, 'time': prayers.asr, 'nameAr': 'العصر', 'nameEn': 'Asr'},
+      {'id': 13, 'time': prayers.maghrib, 'nameAr': 'المغرب', 'nameEn': 'Maghrib'},
+      {'id': 14, 'time': prayers.isha, 'nameAr': 'العشاء', 'nameEn': 'Isha'},
+    ];
+
+    for (var p in prayerTimes) {
+      await _scheduleNotification(
+        id: p['id'] as int,
+        title: isArabic 
+            ? 'حان الآن موعد صلاة ${p['nameAr']} 🕌' 
+            : 'It is time for ${p['nameEn']} prayer 🕌',
+        body: isArabic
+            ? 'أرحنا بها يا بلال. لا تنس أداء الصلاة في وقتها.'
+            : 'Time to pray. Don\'t forget to perform your prayer on time.',
+        scheduledDate: getFutureTime(p['time'] as DateTime),
+      );
+    }
+
+    // 6. Post-Prayer Reminders (15 minutes after)
     final postPrayerMessages = [
       {'id': 5, 'time': prayers.fajr, 'nameAr': 'الفجر', 'nameEn': 'Fajr'},
       {'id': 6, 'time': prayers.dhuhr, 'nameAr': 'الظهر', 'nameEn': 'Dhuhr'},

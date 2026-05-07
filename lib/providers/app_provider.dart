@@ -201,6 +201,20 @@ class AppProvider extends ChangeNotifier {
     _useLocation = prefs.getBool('diyaa-use-location') ?? true;
     _latitude = prefs.getDouble('diyaa-lat');
     _longitude = prefs.getDouble('diyaa-lng');
+
+    // Pre-calculate prayer times if we have cached coordinates
+    if (_latitude != null && _longitude != null) {
+      final info = await PrayerTimesService.loadTodaysPrayers(
+        useLocation: false, // Don't fetch location here, just use cache
+        lastLat: _latitude,
+        lastLng: _longitude,
+      );
+      if (info != null) {
+        _prayerInfo = info;
+        _suggested = PrayerTimesService.suggest(info);
+      }
+    }
+
     _onboardingComplete = prefs.getBool(_kOnboardingCompleteKey) ?? false;
 
     _notifPrayer = prefs.getBool(_kNotifPrayerKey) ?? true;
