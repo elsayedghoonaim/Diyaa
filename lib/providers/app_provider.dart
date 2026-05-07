@@ -57,6 +57,8 @@ class AppProvider extends ChangeNotifier {
   bool _arabicMode = false;
   bool _hijriDates = true;
   bool _useLocation = false;
+  double? _latitude;
+  double? _longitude;
 
   // Settings
   bool _notifPrayer = true;
@@ -197,6 +199,8 @@ class AppProvider extends ChangeNotifier {
     _arabicMode = prefs.getBool(_kArabicModeKey) ?? false;
     _hijriDates = prefs.getBool(_kHijriDatesKey) ?? true;
     _useLocation = prefs.getBool('diyaa-use-location') ?? true;
+    _latitude = prefs.getDouble('diyaa-lat');
+    _longitude = prefs.getDouble('diyaa-lng');
     _onboardingComplete = prefs.getBool(_kOnboardingCompleteKey) ?? false;
 
     _notifPrayer = prefs.getBool(_kNotifPrayerKey) ?? true;
@@ -386,12 +390,23 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final info = await PrayerTimesService.loadTodaysPrayers(useLocation: _useLocation)
-          .timeout(const Duration(seconds: 15), onTimeout: () => null);
+      final info = await PrayerTimesService.loadTodaysPrayers(
+        useLocation: _useLocation,
+        lastLat: _latitude,
+        lastLng: _longitude,
+      ).timeout(const Duration(seconds: 15), onTimeout: () => null);
+
       _prayerInfo = info;
       _suggested  = info != null ? PrayerTimesService.suggest(info) : SuggestedSession.morning;
 
       if (info != null) {
+        // Save new coordinates
+        _latitude = info.latitude;
+        _longitude = info.longitude;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setDouble('diyaa-lat', info.latitude);
+        await prefs.setDouble('diyaa-lng', info.longitude);
+
         try {
           await NotificationService.requestPermissions();
           await NotificationService.scheduleAzkarNotifications(info, isArabic: _arabicMode);

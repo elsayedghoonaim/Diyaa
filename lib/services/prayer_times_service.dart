@@ -11,6 +11,8 @@ class PrayerInfo {
   final DateTime maghrib;
   final DateTime isha;
   final String cityLabel; // e.g. "21.3891°N, 39.8579°E"
+  final double latitude;
+  final double longitude;
 
   const PrayerInfo({
     required this.fajr,
@@ -19,41 +21,61 @@ class PrayerInfo {
     required this.maghrib,
     required this.isha,
     required this.cityLabel,
+    required this.latitude,
+    required this.longitude,
   });
 }
 
 class PrayerTimesService {
   /// Requests location permission if useLocation is true, then computes today's prayer times.
-  /// If useLocation is false or permission is denied, it defaults to Riyadh.
-  static Future<PrayerInfo?> loadTodaysPrayers({bool useLocation = false}) async {
+  /// Uses last known position and cached values for speed.
+  static Future<PrayerInfo?> loadTodaysPrayers({
+    bool useLocation = false,
+    double? lastLat,
+    double? lastLng,
+  }) async {
     try {
-      Position? pos;
-      
+      double lat = lastLat ?? 24.7136; // Default to Riyadh
+      double lng = lastLng ?? 46.6753;
+      bool locationSuccess = false;
+
       if (useLocation) {
-        // 1. Check & request permission
         LocationPermission perm = await Geolocator.checkPermission();
         if (perm == LocationPermission.denied) {
           perm = await Geolocator.requestPermission();
         }
-        if (perm != LocationPermission.denied && perm != LocationPermission.deniedForever) {
-          // 2. Get current position
-          pos = await Geolocator.getCurrentPosition(
-            locationSettings: const LocationSettings(
-              accuracy: LocationAccuracy.low,
-              timeLimit: Duration(seconds: 10),
-            ),
-          );
+
+        if (perm == LocationPermission.whileInUse || perm == LocationPermission.always) {
+          // 1. Try last known position (near-instant)
+          Position? pos = await Geolocator.getLastKnownPosition();
+          
+          // 2. If last known is too old or null, try getting current position with a short timeout
+          if (pos == null) {
+            try {
+              pos = await Geolocator.getCurrentPosition(
+                locationSettings: const LocationSettings(
+                  accuracy: LocationAccuracy.low,
+                  timeLimit: Duration(seconds: 4),
+                ),
+              );
+            } catch (_) {
+              // Timeout or error, pos remains null
+            }
+          }
+
+          if (pos != null) {
+            lat = pos.latitude;
+            lng = pos.longitude;
+            locationSuccess = true;
+          }
         }
       }
 
-      // Fallback to Riyadh
-      final lat = pos?.latitude ?? 24.7136;
-      final lng = pos?.longitude ?? 46.6753;
-      final label = pos != null 
-          ? '${lat.toStringAsFixed(2)}°N, ${lng.toStringAsFixed(2)}°E' 
-          : 'Riyadh';
+      final label = (locationSuccess || (lastLat != null && lastLng != null))
+          ? '${lat.toStringAsFixed(2)}°N, ${lng.toStringAsFixed(2)}°E'
+          : 'Riyadh (Default)';
 
-      // 3. Calculate prayer times using Adhan
+      // Calculate prayer times using Adhan
       final coordinates = Coordinates(lat, lng);
       final params = CalculationMethodParameters.muslimWorldLeague();
       params.madhab = Madhab.shafi;
@@ -73,6 +95,8 @@ class PrayerTimesService {
         maghrib: times.maghrib.toLocal(),
         isha: times.isha.toLocal(),
         cityLabel: label,
+        latitude: lat,
+        longitude: lng,
       );
     } catch (_) {
       return null;
