@@ -1023,8 +1023,6 @@ class _PrayerCardContentState extends State<_PrayerCardContent> {
     final countdown = _toArabic(_countdown());
     final dots = _prayerDots();
 
-    final nextTime = _toArabic(next.time);
-
     return Column(
       children: [
         Row(

@@ -1,4 +1,5 @@
 import 'package:adhan_dart/adhan_dart.dart';
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
 /// The session that should be highlighted/suggested right now based on local time.
@@ -10,9 +11,10 @@ class PrayerInfo {
   final DateTime asr;
   final DateTime maghrib;
   final DateTime isha;
-  final String cityLabel; // e.g. "21.3891°N, 39.8579°E"
+  final String cityLabel;
   final double latitude;
   final double longitude;
+  final String methodName; // For display in settings
 
   const PrayerInfo({
     required this.fajr,
@@ -23,64 +25,78 @@ class PrayerInfo {
     required this.cityLabel,
     required this.latitude,
     required this.longitude,
+    this.methodName = '',
   });
 }
 
 class PrayerTimesService {
-  /// Requests location permission if useLocation is true, then computes today's prayer times.
-  /// Uses last known position and cached values for speed.
-  static Future<PrayerInfo?> loadTodaysPrayers({
-    bool useLocation = false,
-    double? lastLat,
-    double? lastLng,
-  }) async {
-    try {
-      double lat = lastLat ?? 24.7136; // Default to Riyadh
-      double lng = lastLng ?? 46.6753;
-      bool locationSuccess = false;
-
-      if (useLocation) {
-        LocationPermission perm = await Geolocator.checkPermission();
-        if (perm == LocationPermission.denied) {
-          perm = await Geolocator.requestPermission();
-        }
-
-        if (perm == LocationPermission.whileInUse || perm == LocationPermission.always) {
-          // 1. Try last known position (near-instant)
-          Position? pos = await Geolocator.getLastKnownPosition();
-          
-          // 2. If last known is too old or null, try getting current position with a short timeout
-          if (pos == null) {
-            try {
-              pos = await Geolocator.getCurrentPosition(
-                locationSettings: const LocationSettings(
-                  accuracy: LocationAccuracy.low,
-                  timeLimit: Duration(seconds: 4),
-                ),
-              );
-            } catch (_) {
-              // Timeout or error, pos remains null
-            }
-          }
-
-          if (pos != null) {
-            lat = pos.latitude;
-            lng = pos.longitude;
-            locationSuccess = true;
-          }
-        }
-      }
-
-      final label = (locationSuccess || (lastLat != null && lastLng != null))
-          ? '${lat.toStringAsFixed(2)}°N, ${lng.toStringAsFixed(2)}°E'
-          : 'Riyadh (Default)';
-
-      // Calculate prayer times using Adhan
-      final coordinates = Coordinates(lat, lng);
-      final params = CalculationMethodParameters.muslimWorldLeague();
+  // ── Regional method selector ──────────────────────────────────────────────
+  //
+  // Picks the most appropriate calculation method based on coordinates.
+  // No manual selection needed — fully automatic.
+  //
+  //  • Arabian Peninsula / Gulf   → Umm Al-Qura (Makkah)
+  //  • North Africa / Egypt       → Egyptian General Authority
+  //  • South/Southeast Asia       → Karachi (UISA)
+  //  • Rest of the world          → Muslim World League (default)
+  static CalculationParameters _methodForCoords(double lat, double lng) {
+    // Saudi Arabia, UAE, Kuwait, Qatar, Bahrain, Oman, Yemen
+    if (lat >= 12 && lat <= 32 && lng >= 34 && lng <= 60) {
+      final params = CalculationMethodParameters.ummAlQura();
       params.madhab = Madhab.shafi;
+      return params;
+    }
+    // Egypt, Libya, Sudan, Algeria, Morocco, Tunisia
+    if (lat >= 15 && lat <= 38 && lng >= -14 && lng <= 36) {
+      final params = CalculationMethodParameters.egyptian();
+      params.madhab = Madhab.shafi;
+      return params;
+    }
+    // Pakistan, Bangladesh, India
+    if (lat >= 6 && lat <= 38 && lng >= 60 && lng <= 96) {
+      final params = CalculationMethodParameters.karachi();
+      params.madhab = Madhab.hanafi;
+      return params;
+    }
+    // Default: Muslim World League
+    final params = CalculationMethodParameters.muslimWorldLeague();
+    params.madhab = Madhab.shafi;
+    return params;
+  }
 
+  static String methodNameForCoords(double lat, double lng) {
+    if (lat >= 12 && lat <= 32 && lng >= 34 && lng <= 60) {
+      return 'Umm Al-Qura (Makkah)';
+    }
+    if (lat >= 15 && lat <= 38 && lng >= -14 && lng <= 36) {
+      return 'Egyptian General Authority';
+    }
+    if (lat >= 6 && lat <= 38 && lng >= 60 && lng <= 96) {
+      return 'Karachi (UISA)';
+    }
+    return 'Muslim World League';
+  }
+
+  // ── Compute times from raw coordinates (no GPS call) ─────────────────────
+  /// Calculates prayer times for the given lat/lng immediately without
+  /// touching GPS. Used for startup cache and offline/unsupported platforms.
+  ///
+  /// DST note: always passes the UTC date to adhan_dart so astronomical
+  /// calculations are stable. The library returns UTC DateTimes which we
+  /// convert to local (DST-aware) using [_toLocal].
+  static PrayerInfo? computeFromCoords(double lat, double lng, {String? label}) {
+    try {
+      final params = _methodForCoords(lat, lng);
+      final methodName = methodNameForCoords(lat, lng);
+      final coordinates = Coordinates(lat, lng);
+
+      // Use local DateTime — the library extracts year/month/day from it
+      // to anchor the solar calculation to the correct calendar date.
       final now = DateTime.now();
+
+      debugPrint('[PrayerTimes] Computing for $lat,$lng | '
+          'local=$now | tz=${now.timeZoneName} offset=${now.timeZoneOffset}');
+
       final times = PrayerTimes(
         coordinates: coordinates,
         date: now,
@@ -88,44 +104,135 @@ class PrayerTimesService {
         precision: true,
       );
 
+      // adhan_dart returns DateTime.utc(...) — convert to local (DST-aware)
+      DateTime toLocal(DateTime dt) => dt.isUtc ? dt.toLocal() : dt;
+
+      final fajr    = toLocal(times.fajr);
+      final dhuhr   = toLocal(times.dhuhr);
+      final asr     = toLocal(times.asr);
+      final maghrib = toLocal(times.maghrib);
+      final isha    = toLocal(times.isha);
+
+      debugPrint('[PrayerTimes] Fajr=$fajr  Dhuhr=$dhuhr  Maghrib=$maghrib  Isha=$isha');
+
       return PrayerInfo(
-        fajr: times.fajr.toLocal(),
-        dhuhr: times.dhuhr.toLocal(),
-        asr: times.asr.toLocal(),
-        maghrib: times.maghrib.toLocal(),
-        isha: times.isha.toLocal(),
-        cityLabel: label,
+        fajr:    fajr,
+        dhuhr:   dhuhr,
+        asr:     asr,
+        maghrib: maghrib,
+        isha:    isha,
+        cityLabel: label ?? '${lat.toStringAsFixed(2)}°N, ${lng.toStringAsFixed(2)}°E',
         latitude: lat,
         longitude: lng,
+        methodName: methodName,
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[PrayerTimes] computeFromCoords error: $e');
       return null;
     }
   }
 
-  /// Determines which session to suggest based on current time vs prayer times.
+  // ── GPS fetch + compute ───────────────────────────────────────────────────
+  /// Fetches the device GPS position and computes today's prayer times.
   ///
-  /// Logic:
-  ///  • Fajr → Fajr+1h    : Morning Azkar (morning)
-  ///  • After each prayer ±30 min : Post-Prayer Dhikr (postPrayer)
-  ///  • Asr → Maghrib-30min: Evening Azkar (evening)
-  ///  • Isha → Midnight    : Sleep Azkar (sleep)
-  ///  • Midnight → Fajr    : Waking Up / Night (wakeup)
+  /// Falls back gracefully through:
+  ///   1. Live GPS position
+  ///   2. Last known GPS position
+  ///   3. Provided cached [lastLat]/[lastLng]
+  ///   4. Makkah default (21.39°N, 39.86°E)
+  ///
+  /// GPS is skipped entirely on unsupported platforms (Linux/Web desktop).
+  static Future<PrayerInfo?> loadTodaysPrayers({
+    double? lastLat,
+    double? lastLng,
+  }) async {
+    // ── A: Try GPS (Android / iOS / Windows only) ──
+    double? gpsLat;
+    double? gpsLng;
+
+    final isGpsSupported = defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.windows;
+
+    if (isGpsSupported) {
+      try {
+        LocationPermission perm = await Geolocator.checkPermission();
+        if (perm == LocationPermission.denied) {
+          perm = await Geolocator.requestPermission();
+        }
+
+        if (perm == LocationPermission.whileInUse || perm == LocationPermission.always) {
+          // Try last known first (instant)
+          Position? pos = await Geolocator.getLastKnownPosition();
+
+          // If not available, fetch fresh with a short timeout
+          if (pos == null) {
+            try {
+              pos = await Geolocator.getCurrentPosition(
+                locationSettings: const LocationSettings(
+                  accuracy: LocationAccuracy.low,
+                  timeLimit: Duration(seconds: 6),
+                ),
+              );
+            } catch (_) {
+              // Timeout or unsupported — fall through to cache
+            }
+          }
+
+          if (pos != null) {
+            gpsLat = pos.latitude;
+            gpsLng = pos.longitude;
+            debugPrint('[PrayerTimes] GPS success: $gpsLat, $gpsLng');
+          }
+        } else {
+          debugPrint('[PrayerTimes] Location permission denied: $perm');
+        }
+      } catch (e) {
+        debugPrint('[PrayerTimes] GPS error (ignored): $e');
+      }
+    } else {
+      debugPrint('[PrayerTimes] GPS not supported on ${defaultTargetPlatform.name} — using cache/fallback');
+    }
+
+    // ── B: Choose best available coordinates ──
+    final double lat;
+    final double lng;
+    final String label;
+
+    if (gpsLat != null && gpsLng != null) {
+      lat = gpsLat;
+      lng = gpsLng;
+      label = '${lat.toStringAsFixed(2)}°N, ${lng.toStringAsFixed(2)}°E';
+    } else if (lastLat != null && lastLng != null) {
+      lat = lastLat;
+      lng = lastLng;
+      label = '${lat.toStringAsFixed(2)}°N, ${lng.toStringAsFixed(2)}°E (cached)';
+      debugPrint('[PrayerTimes] Using cached coordinates: $lat, $lng');
+    } else {
+      // Makkah fallback — at least shows correct times for most users
+      lat = 21.3891;
+      lng = 39.8579;
+      label = 'Makkah Al-Mukarramah (default)';
+      debugPrint('[PrayerTimes] Using Makkah default coordinates');
+    }
+
+    // ── C: Compute prayer times ──
+    return computeFromCoords(lat, lng, label: label);
+  }
+
+  // ── Session suggestion ────────────────────────────────────────────────────
   static SuggestedSession suggest(PrayerInfo prayers) {
     final now = DateTime.now();
 
-    // Window helpers
     bool inWindow(DateTime start, int afterMinutes) {
       final end = start.add(Duration(minutes: afterMinutes));
       return now.isAfter(start) && now.isBefore(end);
     }
 
-    // Post-prayer window: 30 min after each prayer
     if (inWindow(prayers.fajr, 30)) return SuggestedSession.morning;
     if (inWindow(prayers.dhuhr, 30)) return SuggestedSession.postPrayer;
     if (inWindow(prayers.asr, 30)) return SuggestedSession.postPrayer;
 
-    // Evening: from Asr+30min to Maghrib
     final eveningStart = prayers.asr.add(const Duration(minutes: 30));
     if (now.isAfter(eveningStart) && now.isBefore(prayers.maghrib)) {
       return SuggestedSession.evening;
@@ -133,19 +240,16 @@ class PrayerTimesService {
 
     if (inWindow(prayers.maghrib, 30)) return SuggestedSession.postPrayer;
 
-    // Sleep: from Isha to midnight
     final midnight = DateTime(now.year, now.month, now.day + 1);
     if (now.isAfter(prayers.isha) && now.isBefore(midnight)) {
       return SuggestedSession.sleep;
     }
 
-    // Early morning: midnight to Fajr
     final earlyMorningStart = DateTime(now.year, now.month, now.day);
     if (now.isAfter(earlyMorningStart) && now.isBefore(prayers.fajr)) {
       return SuggestedSession.wakeup;
     }
 
-    // Morning window: Fajr+30min to Dhuhr
     final morningStart = prayers.fajr.add(const Duration(minutes: 30));
     if (now.isAfter(morningStart) && now.isBefore(prayers.dhuhr)) {
       return SuggestedSession.morning;
@@ -154,21 +258,14 @@ class PrayerTimesService {
     return SuggestedSession.none;
   }
 
-  /// Maps SuggestedSession to the azkar.json session id string.
   static String sessionId(SuggestedSession s) {
     switch (s) {
-      case SuggestedSession.morning:
-        return 'morning';
-      case SuggestedSession.evening:
-        return 'morning'; // same JSON session, user sees context from time
-      case SuggestedSession.sleep:
-        return 'sleep';
-      case SuggestedSession.wakeup:
-        return 'wakeup';
-      case SuggestedSession.postPrayer:
-        return 'cat_7'; // Post-wudu / post-prayer dhikr
-      case SuggestedSession.none:
-        return 'morning';
+      case SuggestedSession.morning:     return 'morning';
+      case SuggestedSession.evening:     return 'morning';
+      case SuggestedSession.sleep:       return 'sleep';
+      case SuggestedSession.wakeup:      return 'wakeup';
+      case SuggestedSession.postPrayer:  return 'cat_7';
+      case SuggestedSession.none:        return 'morning';
     }
   }
 }

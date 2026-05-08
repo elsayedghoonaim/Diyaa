@@ -20,7 +20,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final arabic = provider.arabicMode;
 
     final bg = dark ? AppColors.bgDark : AppColors.bgLight;
-    final textPrimary = dark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
     final textSecondary = dark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
     final teal = dark ? AppColors.accentTealDark : AppColors.accentTealLight;
     final gold = dark ? AppColors.accentGoldDark : AppColors.accentGoldLight;

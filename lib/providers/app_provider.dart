@@ -29,6 +29,12 @@ const String _kNotifStreakKey         = 'diyaa-notif-streak';
 const String _kNotifMilestoneKey      = 'diyaa-notif-milestone';
 const String _kSoundEnabledKey        = 'diyaa-sound-enabled';
 
+// Location prefs version — bump when location logic changes to force a reset
+// v1 = original (no GPS toggle)
+// v2 = added GPS toggle + manual city (clear any stale v1 Riyadh cache)
+const int    _kLocationPrefsVersion   = 2;
+const String _kLocationPrefsVerKey    = 'diyaa-location-prefs-ver';
+
 /// A badge definition
 class AzkarBadge {
   final String id;
@@ -53,12 +59,13 @@ class AzkarBadge {
 }
 
 class AppProvider extends ChangeNotifier {
-  bool _darkMode   = false;
-  bool _arabicMode = false;
-  bool _hijriDates = true;
-  bool _useLocation = false;
+  bool _darkMode    = false;
+  bool _arabicMode  = false;
+  bool _hijriDates  = true;
+  bool _useGps      = true;   // true = GPS, false = manual city
   double? _latitude;
   double? _longitude;
+  String _manualCityName = ''; // display name of manually chosen city
 
   // Settings
   bool _notifPrayer = true;
@@ -97,7 +104,9 @@ class AppProvider extends ChangeNotifier {
   bool get darkMode               => _darkMode;
   bool get arabicMode             => _arabicMode;
   bool get hijriDates             => _hijriDates;
-  bool get useLocation            => _useLocation;
+  bool get useGps                 => _useGps;
+  bool get useLocation            => _useGps; // compat alias
+  String get manualCityName       => _manualCityName;
   
   bool get notifPrayer            => _notifPrayer;
   bool get notifStreak            => _notifStreak;
@@ -198,17 +207,26 @@ class AppProvider extends ChangeNotifier {
     _darkMode   = prefs.getBool(_kDarkModeKey)   ?? false;
     _arabicMode = prefs.getBool(_kArabicModeKey) ?? false;
     _hijriDates = prefs.getBool(_kHijriDatesKey) ?? true;
-    _useLocation = prefs.getBool('diyaa-use-location') ?? true;
-    _latitude = prefs.getDouble('diyaa-lat');
-    _longitude = prefs.getDouble('diyaa-lng');
+    // ── Location migration: clear stale cache on version bump ──
+    final locVer = prefs.getInt(_kLocationPrefsVerKey) ?? 0;
+    if (locVer < _kLocationPrefsVersion) {
+      debugPrint('[AppProvider] Location prefs v$locVer → v$_kLocationPrefsVersion: resetting to GPS mode');
+      await prefs.setBool('diyaa-use-gps', true);
+      await prefs.remove('diyaa-manual-city');
+      await prefs.remove('diyaa-lat');
+      await prefs.remove('diyaa-lng');
+      await prefs.setInt(_kLocationPrefsVerKey, _kLocationPrefsVersion);
+    }
 
-    // Pre-calculate prayer times if we have cached coordinates
+    _useGps     = prefs.getBool('diyaa-use-gps') ?? true;
+    _manualCityName = prefs.getString('diyaa-manual-city') ?? '';
+    _latitude   = prefs.getDouble('diyaa-lat');
+    _longitude  = prefs.getDouble('diyaa-lng');
+
+    // Fast startup: if we have cached coordinates, compute times immediately
+    // (no GPS call — that happens in _loadPrayerTimes() below)
     if (_latitude != null && _longitude != null) {
-      final info = await PrayerTimesService.loadTodaysPrayers(
-        useLocation: false, // Don't fetch location here, just use cache
-        lastLat: _latitude,
-        lastLng: _longitude,
-      );
+      final info = PrayerTimesService.computeFromCoords(_latitude!, _longitude!);
       if (info != null) {
         _prayerInfo = info;
         _suggested = PrayerTimesService.suggest(info);
@@ -412,32 +430,70 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final info = await PrayerTimesService.loadTodaysPrayers(
-        useLocation: _useLocation,
-        lastLat: _latitude,
-        lastLng: _longitude,
-      ).timeout(const Duration(seconds: 15), onTimeout: () => null);
+      PrayerInfo? info;
 
-      _prayerInfo = info;
-      _suggested  = info != null ? PrayerTimesService.suggest(info) : SuggestedSession.morning;
+      if (!_useGps && _latitude != null && _longitude != null) {
+        // Manual city — compute instantly from saved coordinates, no GPS
+        debugPrint('[AppProvider] Manual mode: computing from ($_latitude, $_longitude)');
+        info = PrayerTimesService.computeFromCoords(
+          _latitude!, _longitude!,
+          label: _manualCityName.isNotEmpty ? _manualCityName : null,
+        );
+      } else {
+        // GPS mode — try live location
+        info = await PrayerTimesService.loadTodaysPrayers(
+          lastLat: _latitude,
+          lastLng: _longitude,
+        ).timeout(const Duration(seconds: 15), onTimeout: () {
+          debugPrint('[AppProvider] GPS timed out');
+          return null;
+        });
+        // GPS null → cached coords
+        if (info == null && _latitude != null && _longitude != null) {
+          info = PrayerTimesService.computeFromCoords(_latitude!, _longitude!);
+        }
+      }
+
+      // Absolute fallback: Makkah
+      info ??= PrayerTimesService.computeFromCoords(21.3891, 39.8579,
+          label: 'Makkah Al-Mukarramah (default)');
 
       if (info != null) {
-        // Save new coordinates
+        _prayerInfo = info;
+        _suggested = PrayerTimesService.suggest(info);
+
+        // Persist new coordinates for next startup
         _latitude = info.latitude;
         _longitude = info.longitude;
         final prefs = await SharedPreferences.getInstance();
         await prefs.setDouble('diyaa-lat', info.latitude);
         await prefs.setDouble('diyaa-lng', info.longitude);
 
+        debugPrint('[AppProvider] Prayer times loaded: '
+            'Fajr=${info.fajr.toLocal()}, '
+            'method=${info.methodName}, '
+            'location=${info.cityLabel}');
+
         try {
           await NotificationService.requestPermissions();
-          await NotificationService.scheduleAzkarNotifications(info, isArabic: _arabicMode);
-        } catch (_) {
-          // Notification scheduling failed — non-fatal
+          await NotificationService.scheduleAll(
+            info,
+            isArabic: _arabicMode,
+            notifPrayer: _notifPrayer,
+            notifAzkar: _notifPrayer,
+            notifStreak: _notifStreak,
+          );
+        } catch (e) {
+          debugPrint('[AppProvider] Notification scheduling failed: $e');
         }
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[AppProvider] _loadPrayerTimes error: $e');
       _suggested = SuggestedSession.morning;
+      // Try computing from cached coords as last resort
+      if (_latitude != null && _longitude != null && _prayerInfo == null) {
+        _prayerInfo = PrayerTimesService.computeFromCoords(_latitude!, _longitude!);
+      }
     } finally {
       _prayerLoading = false;
       notifyListeners();
@@ -468,19 +524,55 @@ class AppProvider extends ChangeNotifier {
     await prefs.setBool(_kHijriDatesKey, value);
   }
 
-  Future<void> setUseLocation(bool value) async {
-    _useLocation = value;
+  Future<void> setUseGps(bool value) async {
+    _useGps = value;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('diyaa-use-location', value);
+    await prefs.setBool('diyaa-use-gps', value);
     await refreshPrayerTimes();
   }
+
+  /// Called when user picks a city manually.
+  Future<void> setManualCity({
+    required String cityName,
+    required double lat,
+    required double lng,
+  }) async {
+    _useGps = false;
+    _manualCityName = cityName;
+    _latitude = lat;
+    _longitude = lng;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('diyaa-use-gps', false);
+    await prefs.setString('diyaa-manual-city', cityName);
+    await prefs.setDouble('diyaa-lat', lat);
+    await prefs.setDouble('diyaa-lng', lng);
+    await refreshPrayerTimes();
+  }
+
+  // Compat alias
+  Future<void> setUseLocation(bool value) => setUseGps(value);
 
   Future<void> setNotifPrayer(bool value) async {
     _notifPrayer = value;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kNotifPrayerKey, value);
+    // Reschedule with updated preference
+    if (_prayerInfo != null) {
+      try {
+        await NotificationService.scheduleAll(
+          _prayerInfo!,
+          isArabic: _arabicMode,
+          notifPrayer: _notifPrayer,
+          notifAzkar: _notifPrayer,
+          notifStreak: _notifStreak,
+        );
+      } catch (e) {
+        debugPrint('[AppProvider] Reschedule after setNotifPrayer failed: $e');
+      }
+    }
   }
 
   Future<void> setNotifStreak(bool value) async {
@@ -488,6 +580,16 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kNotifStreakKey, value);
+    // Cancel or re-enable streak warning
+    if (!value) {
+      try {
+        await NotificationService.scheduleStreakWarning(enabled: false, isArabic: _arabicMode, currentStreak: _streak);
+      } catch (_) {}
+    } else if (_streak > 0) {
+      try {
+        await NotificationService.scheduleStreakWarning(enabled: true, isArabic: _arabicMode, currentStreak: _streak);
+      } catch (_) {}
+    }
   }
 
   Future<void> setNotifMilestone(bool value) async {

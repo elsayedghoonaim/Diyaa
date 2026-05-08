@@ -346,7 +346,6 @@ class _ThemeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cardBg = dark ? AppColors.cardBgDark : AppColors.cardBgLight;
     final textPrimary = dark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-    final secondary = dark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
     final teal = dark ? AppColors.accentTealDark : AppColors.accentTealLight;
     final border = dark ? AppColors.borderDark : AppColors.borderLight;
 

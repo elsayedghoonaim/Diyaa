@@ -7,6 +7,8 @@ import 'package:provider/provider.dart';
 import 'package:diyaa/providers/app_provider.dart';
 import 'package:diyaa/theme/app_colors.dart';
 import 'package:diyaa/widgets/shared/islamic_pattern.dart';
+import 'package:diyaa/widgets/zikr/zikr_share_card.dart';
+import 'package:diyaa/services/share_service.dart';
 import 'celebration_screen.dart';
 
 // ─────────────────────────────────────────────
@@ -160,6 +162,116 @@ class _ZikrScreenState extends State<ZikrScreen> {
   int _zikrIdx = 0;
   List<int> _counts = []; // Per-zikr counts — preserved when navigating
   bool _loading = true;
+  bool _isAdvancing = false; // Guard against double-taps during auto-advance delay
+  final GlobalKey _shareCardKey = GlobalKey(); // RepaintBoundary key for image capture
+
+  // ── Share ──────────────────────────────────────────────────────────────────
+  void _shareZikr(BuildContext context) {
+    if (_session == null) return;
+    final prov = context.read<AppProvider>();
+    final dark = prov.darkMode;
+    final arabic = prov.arabicMode;
+    final zikr = _session!.zikrs[_zikrIdx];
+    final teal = dark ? AppColors.accentTealDark : AppColors.accentTealLight;
+    final gold = dark ? AppColors.accentGoldDark : AppColors.accentGoldLight;
+    final bg   = dark ? AppColors.bgDark : AppColors.bgLight;
+    final textPrimary = dark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetCtx) => Container(
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border.all(color: dark ? AppColors.borderDark : AppColors.borderLight),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle bar
+            Container(
+              width: 36, height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: (dark ? AppColors.borderDark : AppColors.borderLight),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Text(
+              arabic ? 'مشاركة الذكر' : 'Share this Zikr',
+              style: TextStyle(
+                fontSize: 17, fontWeight: FontWeight.w700, color: textPrimary,
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Share as Text button
+            _ShareOptionTile(
+              icon: Icons.text_fields_rounded,
+              color: teal,
+              label: arabic ? 'مشاركة كنص' : 'Share as Text',
+              sublabel: arabic ? 'نص عربي منسق مع المصدر' : 'Formatted Arabic text with source',
+              dark: dark,
+              onTap: () async {
+                Navigator.of(sheetCtx).pop();
+                await ShareService.shareAsText(
+                  arabicText: zikr.arabic,
+                  repeatCount: zikr.repeat,
+                  categoryAr: _session!.nameAr,
+                  isArabic: arabic,
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            // Share as Image button
+            _ShareOptionTile(
+              icon: Icons.image_outlined,
+              color: gold,
+              label: arabic ? 'مشاركة كصورة' : 'Share as Image',
+              sublabel: arabic ? 'بطاقة جميلة جاهزة للنشر' : 'Beautiful branded card image',
+              dark: dark,
+              onTap: () async {
+                Navigator.of(sheetCtx).pop();
+                // Build the card off-screen in an Overlay so it can be captured
+                _captureAndShareImage(context, zikr, arabic);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _captureAndShareImage(BuildContext context, ZikrItem zikr, bool arabic) {
+    if (_session == null) return;
+    // Insert an off-screen Overlay entry containing the share card
+    final overlay = Overlay.of(context);
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (_) => Positioned(
+        left: -10000, // Push off-screen
+        top: -10000,
+        child: RepaintBoundary(
+          key: _shareCardKey,
+          child: ZikrShareCard(
+            arabicText: zikr.arabic,
+            repeatCount: zikr.repeat,
+            categoryAr: _session!.nameAr,
+            categoryEn: _getEnglishCategoryName(_session!.nameAr),
+            isArabic: arabic,
+          ),
+        ),
+      ),
+    );
+    overlay.insert(entry);
+    // Wait one frame for the widget to lay out, then capture
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await ShareService.shareAsImage(_shareCardKey);
+      entry.remove();
+    });
+  }
 
   @override
   void initState() {
@@ -302,33 +414,46 @@ class _ZikrScreenState extends State<ZikrScreen> {
   }
 
   void _increment() {
-    if (_session == null) return;
-    
+    if (_session == null || _isAdvancing) return;
+
     final provider = context.read<AppProvider>();
     if (provider.soundEnabled) {
       HapticFeedback.lightImpact();
     }
-    
+
     final total = _session!.zikrs[_zikrIdx].repeat;
+
+    // If we've already reached the target, ignore extra taps (handled by auto-advance)
+    if (_counts[_zikrIdx] >= total) return;
+
     setState(() {
-      if (_counts[_zikrIdx] < total) {
-        _counts[_zikrIdx]++;
-      } else {
-        if (provider.soundEnabled) {
-          HapticFeedback.mediumImpact();
-        }
-        if (_zikrIdx < _session!.zikrs.length - 1) {
-          _zikrIdx++;
-          // Do NOT reset count — it was already at max for prev, and new zikr starts at 0
-        } else {
-          // All zikrs completed! Trigger celebration
-          _completeSession();
-          return; // Don't save progress after completion (it will be cleared)
-        }
-      }
-      _saveProgress();
+      _counts[_zikrIdx]++;
     });
+    _saveProgress();
+
+    // When the count reaches the target, auto-advance after a brief visual pause
+    if (_counts[_zikrIdx] >= total) {
+      if (provider.soundEnabled) {
+        HapticFeedback.mediumImpact();
+      }
+
+      _isAdvancing = true;
+
+      Future.delayed(const Duration(milliseconds: 400), () {
+        if (!mounted) return;
+        _isAdvancing = false;
+
+        if (_zikrIdx < _session!.zikrs.length - 1) {
+          setState(() => _zikrIdx++);
+          _saveProgress();
+        } else {
+          // All zikrs done — show celebration
+          _completeSession();
+        }
+      });
+    }
   }
+
 
   void _completeSession() {
     if (_session == null) return;
@@ -355,18 +480,22 @@ class _ZikrScreenState extends State<ZikrScreen> {
   }
 
   void _goPrev() {
-    if (_zikrIdx > 0) setState(() { 
-      _zikrIdx--; 
-      _saveProgress();
-    });
+    if (_zikrIdx > 0) {
+      setState(() { 
+        _zikrIdx--; 
+        _saveProgress();
+      });
+    }
   }
 
   void _goNext() {
     if (_session == null) return;
-    if (_zikrIdx < _session!.zikrs.length - 1) setState(() { 
-      _zikrIdx++; 
-      _saveProgress();
-    });
+    if (_zikrIdx < _session!.zikrs.length - 1) {
+      setState(() { 
+        _zikrIdx++; 
+        _saveProgress();
+      });
+    }
   }
 
   void _goToIndex(int i) => setState(() { 
@@ -417,6 +546,7 @@ class _ZikrScreenState extends State<ZikrScreen> {
                         nameAr: sessionNameAr,
                         nameEn: !arabic ? sessionNameEn : '',
                         onBack: () => Navigator.of(context).pop(),
+                        onShare: _session != null ? () => _shareZikr(context) : null,
                       ),
 
                       const SizedBox(height: 12), // Added space here
@@ -509,6 +639,7 @@ class _Header extends StatelessWidget {
   final Color textSec, teal, gold;
   final String nameAr, nameEn;
   final VoidCallback onBack;
+  final VoidCallback? onShare;
 
   const _Header({
     required this.arabic,
@@ -518,6 +649,7 @@ class _Header extends StatelessWidget {
     required this.nameAr,
     required this.nameEn,
     required this.onBack,
+    this.onShare,
   });
 
   @override
@@ -525,33 +657,28 @@ class _Header extends StatelessWidget {
     return Directionality(
       textDirection: TextDirection.ltr,
       child: Padding(
-        // Increased top from 14→24 to push header down slightly
         padding: const EdgeInsets.fromLTRB(20, 24, 20, 10),
         child: Row(
           children: [
+            // Back button
             GestureDetector(
               onTap: onBack,
               child: SizedBox(
                 width: 36, height: 36,
-                child: Icon(
-                  Icons.chevron_left,
-                  size: 26,
-                  color: textSec,
-                ),
+                child: Icon(Icons.chevron_left, size: 26, color: textSec),
               ),
             ),
+            // Title (centered)
             Expanded(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Title: Amiri 24
                   Text(
                     nameAr,
                     textAlign: TextAlign.center,
                     style: GoogleFonts.amiri(fontSize: 24, color: gold, height: 1.2),
                   ),
-                  // Subtitle: 12px
                   if (!arabic)
                     Text(
                       nameEn,
@@ -561,14 +688,23 @@ class _Header extends StatelessWidget {
                 ],
               ),
             ),
-            // Empty box to balance the back button and keep title centered
-            const SizedBox(width: 36, height: 36),
+            // Share button (balances back button; visible when content is loaded)
+            SizedBox(
+              width: 36, height: 36,
+              child: onShare != null
+                  ? GestureDetector(
+                      onTap: onShare,
+                      child: Icon(Icons.ios_share_rounded, size: 22, color: textSec),
+                    )
+                  : const SizedBox.shrink(),
+            ),
           ],
         ),
       ),
     );
   }
 }
+
 
 // ─────────────────────────────────────────────
 // Progress Bar
@@ -1038,4 +1174,68 @@ class _StarDot extends CustomPainter {
 
   @override
   bool shouldRepaint(_StarDot old) => old.color != color;
+}
+
+// ─────────────────────────────────────────────
+// Share Option Tile — used inside the share bottom sheet
+// ─────────────────────────────────────────────
+class _ShareOptionTile extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String label, sublabel;
+  final bool dark;
+  final VoidCallback onTap;
+
+  const _ShareOptionTile({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.sublabel,
+    required this.dark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cardBg    = dark ? AppColors.cardBgDark   : AppColors.cardBgLight;
+    final borderCol = dark ? AppColors.borderDark    : AppColors.borderLight;
+    final textPri   = dark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final textSec   = dark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderCol),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44, height: 44,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: textPri)),
+                  const SizedBox(height: 2),
+                  Text(sublabel, style: TextStyle(fontSize: 12, color: textSec)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, size: 18, color: textSec),
+          ],
+        ),
+      ),
+    );
+  }
 }

@@ -7,7 +7,7 @@ import '../theme/app_colors.dart';
 import '../widgets/shared/islamic_pattern.dart';
 import '../widgets/settings/section_widget.dart';
 import '../widgets/settings/setting_row.dart';
-import '../widgets/settings/prayer_method_sheet.dart';
+import '../widgets/settings/city_sheet.dart';
 import '../widgets/settings/privacy_sheet.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -18,7 +18,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  String selectedMethod = 'Muslim World League';
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +32,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final teal = dark ? AppColors.accentTealDark : AppColors.accentTealLight;
     final gold = dark ? AppColors.accentGoldDark : AppColors.accentGoldLight;
     
-    final gpsEnabled = provider.useLocation;
     final locationLabel = provider.prayerInfo?.cityLabel ?? t('Locating...', 'جاري التحديد...');
 
     return Directionality(
@@ -150,18 +148,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             title: 'Location & Prayer Times',
                             ar: 'الموقع ومواقيت الصلاة',
                             children: [
+                              // GPS toggle
                               SettingRow(
                                 icon: Icons.near_me_outlined,
                                 iconColor: teal,
-                                iconBgMode: gpsEnabled ? 'teal_active' : 'teal',
-                                label: 'Use My Location',
-                                arLabel: 'استخدام موقعي',
-                                sublabel: gpsEnabled
-                                    ? t('GPS · Auto prayer times', 'GPS · مواقيت تلقائية')
-                                    : t('Location is currently disabled', 'الموقع معطل حالياً'),
-                                rightWidget: _Toggle(on: gpsEnabled, onToggle: () => provider.setUseLocation(!gpsEnabled), teal: teal),
+                                iconBgMode: provider.useGps ? 'teal_active' : 'teal',
+                                label: 'Use GPS Location',
+                                arLabel: 'استخدام GPS',
+                                sublabel: provider.useGps
+                                    ? t('Automatic · Updates with your position', 'تلقائي · يتحدث حسب موقعك')
+                                    : t('Tap to enable GPS', 'اضغط لتفعيل GPS'),
+                                rightWidget: _Toggle(
+                                  on: provider.useGps,
+                                  onToggle: () => provider.setUseGps(!provider.useGps),
+                                  teal: teal,
+                                ),
                               ),
-                              if (gpsEnabled)
+
+                              // Manual city picker (shown when GPS is off)
+                              if (!provider.useGps)
+                                SettingRow(
+                                  icon: Icons.location_city,
+                                  iconColor: gold,
+                                  iconBgMode: 'gold',
+                                  label: 'Choose City',
+                                  arLabel: 'اختر المدينة',
+                                  sublabel: provider.manualCityName.isNotEmpty
+                                      ? provider.manualCityName
+                                      : t('Tap to select your city', 'اضغط لاختيار مدينتك'),
+                                  rightWidget: Icon(
+                                    arabic ? Icons.chevron_left : Icons.chevron_right,
+                                    size: 16, color: textSecondary,
+                                  ),
+                                  onTap: () => showModalBottomSheet(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    backgroundColor: Colors.transparent,
+                                    builder: (_) => const CitySheet(),
+                                  ),
+                                ),
+
+                              // Current location label
+                              if (provider.prayerInfo != null)
                                 Padding(
                                   padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
                                   child: Container(
@@ -177,7 +205,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                         const SizedBox(width: 8),
                                         Expanded(
                                           child: Text(
-                                            '$locationLabel · ${t('Auto-updating', 'تحديث تلقائي')}',
+                                            locationLabel,
                                             style: TextStyle(fontSize: 12, color: teal, fontWeight: FontWeight.w500),
                                           ),
                                         ),
@@ -185,24 +213,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     ),
                                   ),
                                 ),
+
+                              // Auto-detected method (read-only)
                               SettingRow(
-                                icon: Icons.public,
+                                icon: Icons.auto_awesome,
                                 iconColor: gold,
                                 iconBgMode: 'gold',
-                                label: 'Prayer Method',
+                                label: 'Calculation Method',
                                 arLabel: 'طريقة الحساب',
-                                sublabel: selectedMethod,
-                                rightWidget: Icon(arabic ? Icons.chevron_left : Icons.chevron_right, size: 16, color: textSecondary),
+                                sublabel: provider.prayerInfo?.methodName.isNotEmpty == true
+                                    ? '${t('Auto', 'تلقائي')}: ${provider.prayerInfo!.methodName}'
+                                    : t('Auto-detected by location', 'تلقائي حسب الموقع'),
+                                rightWidget: Icon(Icons.gps_fixed, size: 14, color: teal),
                                 isLast: true,
-                                onTap: () => showModalBottomSheet(
-                                  context: context,
-                                  isScrollControlled: true,
-                                  backgroundColor: Colors.transparent,
-                                  builder: (_) => PrayerMethodSheet(
-                                    selected: selectedMethod,
-                                    onSelect: (val) => setState(() => selectedMethod = val),
-                                  ),
-                                ),
                               ),
                             ],
                           ),
