@@ -3,27 +3,18 @@
     backup_rules.xml
     Referenced by android:fullBackupContent in AndroidManifest.xml.
 
-    Excludes sensitive runtime data from Android Auto Backup (API 23+)
-    and Cloud Backup so notification schedules and shared_preferences
-    are not restored to a different device in a broken state.
-
-    Notification-related files that should NOT be backed up:
-      - flutter_local_notifications stores pending alarm data in shared_prefs
-      - timezone / adhan prayer-time cache is device+location specific
-      - Any file under the app's cache dir
-
-    User preferences (diyaa_prefs) ARE backed up — they contain language,
-    notification toggles, and streak data that the user wants to keep.
+    Valid domains for <full-backup-content>:
+      file, database, sharedpref, external, root,
+      device_file, device_database, device_sharedpref, device_root
+    ("cache" and "externalCache" are NOT valid — use "external" instead)
 -->
 <full-backup-content>
 
-    <!-- Exclude notification scheduling state — alarm IDs are device-specific -->
+    <!-- Exclude notification scheduling state: alarm IDs are device-specific
+         and break if restored to a different device. -->
     <exclude domain="sharedpref" path="notification_plugin_cache.xml"/>
 
-    <!-- Exclude all cache files — always regenerated on next launch -->
-    <exclude domain="cache" path="."/>
-
-    <!-- Exclude external cache -->
-    <exclude domain="externalCache" path="."/>
+    <!-- Exclude all external storage files (includes external cache) -->
+    <exclude domain="external" path="."/>
 
 </full-backup-content>

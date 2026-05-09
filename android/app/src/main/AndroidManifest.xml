@@ -8,28 +8,20 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
 
     <!-- ── Notifications ────────────────────────────────────────────────── -->
-    <!-- POST_NOTIFICATIONS: required on Android 13+ (API 33+) to show any
-         notification. Requested at runtime in NotificationService. -->
+    <!-- POST_NOTIFICATIONS: required on Android 13+ (API 33+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
     <!-- SCHEDULE_EXACT_ALARM: required on Android 12+ (API 31+) for
-         flutter_local_notifications zonedSchedule with exactAllowWhileIdle.
-         FIX: USE_EXACT_ALARM removed — it conflicts with SCHEDULE_EXACT_ALARM
-         on API 33+ and can cause Play Store rejection for non-clock apps.
-         The runtime revocation check in NotificationService handles the case
-         where the user revokes this permission from device settings. -->
+         flutter_local_notifications zonedSchedule exactAllowWhileIdle. -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
 
-    <!-- RECEIVE_BOOT_COMPLETED: allows rescheduling notifications after
-         device reboot via ScheduledNotificationBootReceiver. -->
+    <!-- RECEIVE_BOOT_COMPLETED: reschedule notifications after reboot -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 
-    <!-- USE_FOREGROUND_SERVICE: required on Android 9+ (API 28+) to start
-         a foreground service for reliable notification delivery. -->
+    <!-- FOREGROUND_SERVICE: required on Android 9+ (API 28+) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
 
-    <!-- WAKE_LOCK: allows the CPU to stay awake while processing an exact
-         alarm so notifications are not dropped under Doze mode. -->
+    <!-- WAKE_LOCK: keep CPU awake while processing exact alarms -->
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
 
     <application
@@ -65,17 +57,14 @@
         <!-- ── flutter_local_notifications receivers ──────────────────── -->
 
         <!-- Fires scheduled notifications.
-             FIX: android:directBootAware="true" added so alarms can fire
-             immediately after reboot even before the user unlocks the device
-             (Direct Boot mode, Android 7+ / API 24+). -->
+             directBootAware: alarms fire immediately after reboot even
+             before the user unlocks (Direct Boot mode, API 24+). -->
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
             android:exported="false"
             android:directBootAware="true"/>
 
-        <!-- Reschedules all notifications after device reboot or app update.
-             FIX: android:directBootAware="true" added for the same reason —
-             must be able to register alarms in Direct Boot mode. -->
+        <!-- Reschedules all notifications after device reboot or app update. -->
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
             android:exported="false"
@@ -88,12 +77,12 @@
             </intent-filter>
         </receiver>
 
-        <!-- Foreground service for reliable notification delivery on
-             Android 12+ under strict background process limits. -->
-        <service
-            android:name="com.dexterous.flutterlocalnotifications.FlutterLocalNotificationsPlugin"
-            android:exported="false"
-            android:foregroundServiceType="shortService"/>
+        <!-- NOTE: The <service> entry for FlutterLocalNotificationsPlugin
+             has been intentionally removed. That class is NOT a Service
+             subclass — declaring it as one causes an [Instantiatable] lint
+             error that blocks release builds. The plugin works correctly
+             without this entry; it registers its own service internally
+             via its AAR manifest merger. -->
 
     </application>
 
