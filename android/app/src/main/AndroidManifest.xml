@@ -1,15 +1,44 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- ── Network ──────────────────────────────────────────────────────── -->
     <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- ── Location (for GPS prayer times) ─────────────────────────────── -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+
+    <!-- ── Notifications ────────────────────────────────────────────────── -->
+    <!-- POST_NOTIFICATIONS: required on Android 13+ (API 33+) to show any
+         notification. Requested at runtime in NotificationService. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+    <!-- SCHEDULE_EXACT_ALARM: required on Android 12+ (API 31+) for
+         flutter_local_notifications zonedSchedule with exactAllowWhileIdle.
+         FIX: USE_EXACT_ALARM removed — it conflicts with SCHEDULE_EXACT_ALARM
+         on API 33+ and can cause Play Store rejection for non-clock apps.
+         The runtime revocation check in NotificationService handles the case
+         where the user revokes this permission from device settings. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+
+    <!-- RECEIVE_BOOT_COMPLETED: allows rescheduling notifications after
+         device reboot via ScheduledNotificationBootReceiver. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+
+    <!-- USE_FOREGROUND_SERVICE: required on Android 9+ (API 28+) to start
+         a foreground service for reliable notification delivery. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+
+    <!-- WAKE_LOCK: allows the CPU to stay awake while processing an exact
+         alarm so notifications are not dropped under Doze mode. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+
     <application
         android:label="Diyaa"
         android:name="${applicationName}"
-        android:icon="@mipmap/launcher_icon">
+        android:icon="@mipmap/launcher_icon"
+        android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_rules">
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -19,43 +48,61 @@
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
-            <!-- Specifies an Android theme to apply to this Activity as soon as
-                 the Android process has started. This theme is visible to the user
-                 while the Flutter UI initializes. After that, this theme continues
-                 to determine the Window background behind the Flutter UI. -->
             <meta-data
-              android:name="io.flutter.embedding.android.NormalTheme"
-              android:resource="@style/NormalTheme"
-              />
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme"/>
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <!-- Don't delete the meta-data below.
-             This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
+
+        <!-- Flutter embedding version -->
         <meta-data
             android:name="flutterEmbedding"
-            android:value="2" />
-        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
-        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            android:value="2"/>
+
+        <!-- ── flutter_local_notifications receivers ──────────────────── -->
+
+        <!-- Fires scheduled notifications.
+             FIX: android:directBootAware="true" added so alarms can fire
+             immediately after reboot even before the user unlocks the device
+             (Direct Boot mode, Android 7+ / API 24+). -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
+            android:exported="false"
+            android:directBootAware="true"/>
+
+        <!-- Reschedules all notifications after device reboot or app update.
+             FIX: android:directBootAware="true" added for the same reason —
+             must be able to register alarms in Direct Boot mode. -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
+            android:exported="false"
+            android:directBootAware="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
-                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
             </intent-filter>
         </receiver>
-    </application>
-    <!-- Required to query activities that can process text, see:
-         https://developer.android.com/training/package-visibility and
-         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
 
-         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+        <!-- Foreground service for reliable notification delivery on
+             Android 12+ under strict background process limits. -->
+        <service
+            android:name="com.dexterous.flutterlocalnotifications.FlutterLocalNotificationsPlugin"
+            android:exported="false"
+            android:foregroundServiceType="shortService"/>
+
+    </application>
+
+    <!-- Required for Flutter text processing plugin -->
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
     </queries>
+
 </manifest>

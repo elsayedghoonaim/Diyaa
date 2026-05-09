@@ -1,0 +1,75 @@
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+
+/// Real implementation for Android / iOS / macOS.
+/// Uses named parameters — required since flutter_local_notifications v20+.
+Future<void> scheduleNotification(
+  FlutterLocalNotificationsPlugin plugin, {
+  required int id,
+  required String channelId,
+  required String channelName,
+  required String title,
+  required String body,
+  required tz.TZDateTime tzTime,
+}) async {
+  await plugin.zonedSchedule(
+    id: id,
+    title: title,
+    body: body,
+    scheduledDate: tzTime,
+    notificationDetails: NotificationDetails(
+      android: AndroidNotificationDetails(
+        channelId,
+        channelName,
+        importance: Importance.high,
+        priority: Priority.high,
+        styleInformation: const BigTextStyleInformation(''),
+      ),
+      iOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+    ),
+    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    matchDateTimeComponents: DateTimeComponents.time,
+  );
+}
+
+Future<void> cancelNotification(
+  FlutterLocalNotificationsPlugin plugin,
+  int id,
+) async {
+  await plugin.cancel(id: id);
+}
+
+Future<void> cancelAllNotifications(
+  FlutterLocalNotificationsPlugin plugin,
+) async {
+  await plugin.cancelAll();
+}
+
+Future<void> showNotification(
+  FlutterLocalNotificationsPlugin plugin, {
+  required int id,
+  required String title,
+  required String body,
+  required String channelId,
+  required String channelName,
+}) async {
+  await plugin.show(
+    id: id,
+    title: title,
+    body: body,
+    notificationDetails: NotificationDetails(
+      android: AndroidNotificationDetails(
+        channelId,
+        channelName,
+        importance: Importance.defaultImportance,
+        priority: Priority.defaultPriority,
+        playSound: false,
+      ),
+      iOS: const DarwinNotificationDetails(),
+    ),
+  );
+}
