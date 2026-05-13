@@ -269,6 +269,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 rightWidget: _Toggle(on: provider.notifPrayer, onToggle: () => provider.setNotifPrayer(!provider.notifPrayer), teal: teal),
                               ),
                               SettingRow(
+                                icon: Icons.auto_awesome,
+                                iconColor: teal,
+                                iconBgMode: 'teal',
+                                label: 'Azkar Reminders',
+                                arLabel: 'تذكيرات الأذكار',
+                                sublabel: t('Morning, evening & post-prayer azkar', 'أذكار الصباح والمساء وما بعد الصلاة'),
+                                rightWidget: _Toggle(on: provider.notifAzkar, onToggle: () => provider.setNotifAzkar(!provider.notifAzkar), teal: teal),
+                              ),
+                              SettingRow(
                                 icon: Icons.notifications_none_outlined,
                                 iconColor: gold,
                                 iconBgMode: 'gold',

@@ -125,8 +125,15 @@ class NotificationService {
         AndroidFlutterLocalNotificationsPlugin>();
     if (android != null) {
       final notif = await android.requestNotificationsPermission();
-      final alarm = await android.requestExactAlarmsPermission();
-      debugPrint('[Notifications] Android — notif: $notif, alarm: $alarm');
+      // On Android 14+, SCHEDULE_EXACT_ALARM is denied by default.
+      // Check before requesting to avoid unnecessary system-settings redirect.
+      bool? canExact = await android.canScheduleExactNotifications();
+      if (canExact != true) {
+        await android.requestExactAlarmsPermission();
+        // Re-check after the user returns from system settings
+        canExact = await android.canScheduleExactNotifications();
+      }
+      debugPrint('[Notifications] Android — notif: $notif, exactAlarms: $canExact');
     }
 
     final ios = _plugin.resolvePlatformSpecificImplementation<
@@ -138,6 +145,18 @@ class NotificationService {
     }
   }
 
+  /// Whether exact alarms can be scheduled on the current platform.
+  /// Returns false on non-mobile or when Android has revoked the permission.
+  static Future<bool> canScheduleExact() async {
+    if (!_isMobile) return false;
+    final android = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    if (android != null) {
+      return await android.canScheduleExactNotifications() ?? false;
+    }
+    return true; // iOS always supports scheduled notifications
+  }
+
   // ══════════════════════════════════════════════════════════════════════════
   // MASTER SCHEDULER
   // ══════════════════════════════════════════════════════════════════════════
@@ -147,6 +166,7 @@ class NotificationService {
     required bool notifPrayer,
     required bool notifAzkar,
     required bool notifStreak,
+    int currentStreak = 0,
   }) async {
     if (!_isMobile) {
       debugPrint('[Notifications] scheduleAll skipped on non-mobile platform.');
@@ -157,7 +177,15 @@ class NotificationService {
 
     if (notifPrayer) await _schedulePrayerTimes(prayers, isArabic: isArabic);
     if (notifAzkar)  await _scheduleAzkarReminders(prayers, isArabic: isArabic);
-    if (!notifStreak) await _cancelOne(_idStreakWarning);
+
+    // FIX: _cancelAll() wiped the streak notification — always reschedule it.
+    // Previously this only canceled when notifStreak was false, but never
+    // recreated the notification after the cancelAll() above destroyed it.
+    await scheduleStreakWarning(
+      enabled: notifStreak,
+      isArabic: isArabic,
+      currentStreak: currentStreak,
+    );
   }
 
   // ══════════════════════════════════════════════════════════════════════════

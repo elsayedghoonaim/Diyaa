@@ -12,6 +12,16 @@ Future<void> scheduleNotification(
   required String body,
   required tz.TZDateTime tzTime,
 }) async {
+  // FIX: On Android 14+ (API 34), SCHEDULE_EXACT_ALARM is denied by default.
+  // If exact alarms aren't available, fall back to inexact (slightly less
+  // precise but still fires) instead of throwing a SecurityException.
+  final android = plugin.resolvePlatformSpecificImplementation<
+      AndroidFlutterLocalNotificationsPlugin>();
+  bool canExact = true;
+  if (android != null) {
+    canExact = await android.canScheduleExactNotifications() ?? false;
+  }
+
   await plugin.zonedSchedule(
     id: id,
     title: title,
@@ -31,7 +41,9 @@ Future<void> scheduleNotification(
         presentSound: true,
       ),
     ),
-    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    androidScheduleMode: canExact
+        ? AndroidScheduleMode.exactAllowWhileIdle
+        : AndroidScheduleMode.inexactAllowWhileIdle,
     matchDateTimeComponents: DateTimeComponents.time,
   );
 }

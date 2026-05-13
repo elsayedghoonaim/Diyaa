@@ -424,8 +424,9 @@ class AppProvider extends ChangeNotifier {
         _prayerInfo!,
         isArabic:    _arabicMode,
         notifPrayer: _notifPrayer,
-        notifAzkar:  _notifAzkar,   // FIX: was always _notifPrayer before
+        notifAzkar:  _notifAzkar,
         notifStreak: _notifStreak,
+        currentStreak: _streak,
       );
     } catch (e) {
       debugPrint('[AppProvider] _rescheduleNotifications failed: $e');

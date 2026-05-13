@@ -15,6 +15,10 @@
          flutter_local_notifications zonedSchedule exactAllowWhileIdle. -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
 
+    <!-- USE_EXACT_ALARM: auto-granted for alarm/prayer/calendar apps (API 33+).
+         Ensures exact alarms work without user needing to grant manually. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+
     <!-- RECEIVE_BOOT_COMPLETED: reschedule notifications after reboot -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 
