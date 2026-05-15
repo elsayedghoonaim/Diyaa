@@ -20,12 +20,8 @@ void main() async {
   try {
     await NotificationService.initialize();
     await NotificationService.requestPermissions();
-    // DEBUG: Send an immediate test notification to verify the pipeline works.
-    // Remove this line once notifications are confirmed working.
-    await NotificationService.sendTestNotification();
   } catch (e) {
     // Non-fatal: the app still launches without notifications.
-    // The error is now logged properly instead of being silently swallowed.
     debugPrint('[main] NotificationService startup failed: $e');
   }
 

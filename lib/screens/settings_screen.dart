@@ -312,7 +312,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 rightWidget: Icon(arabic ? Icons.chevron_left : Icons.chevron_right, size: 16, color: textSecondary),
                                 onTap: () async {
                                   try {
-                                    await NotificationService.sendTestNotification();
+                                    await NotificationService.sendTestNotification(isArabic: arabic);
                                     if (context.mounted) {
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(content: Text(t('Test notification sent! ✅', 'تم إرسال إشعار تجريبي! ✅'))),

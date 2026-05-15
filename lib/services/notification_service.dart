@@ -313,13 +313,15 @@ class NotificationService {
   // TEST NOTIFICATION — fires immediately to verify the pipeline works.
   // Call from settings or on startup for debugging.
   // ══════════════════════════════════════════════════════════════════════════
-  static Future<void> sendTestNotification() async {
+  static Future<void> sendTestNotification({bool isArabic = false}) async {
     try {
       debugPrint('[Notifications] Sending test notification…');
       await _plugin.show(
         id: 99,
-        title: 'Diyaa Test ✅',
-        body: 'If you see this, notifications are working!',
+        title: isArabic ? 'اختبار إشعارات ضياء ✅' : 'Diyaa Notifications Test ✅',
+        body: isArabic
+            ? 'الإشعارات تعمل بشكل صحيح!'
+            : 'If you see this, notifications are working!',
         notificationDetails: const NotificationDetails(
           android: AndroidNotificationDetails(
             _channelPrayer,
