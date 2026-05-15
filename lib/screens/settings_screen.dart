@@ -9,6 +9,7 @@ import '../widgets/settings/section_widget.dart';
 import '../widgets/settings/setting_row.dart';
 import '../widgets/settings/city_sheet.dart';
 import '../widgets/settings/privacy_sheet.dart';
+import '../services/notification_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -300,6 +301,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 label: 'Sound & Haptics',
                                 arLabel: 'الصوت والاهتزاز',
                                 rightWidget: _Toggle(on: provider.soundEnabled, onToggle: () => provider.setSoundEnabled(!provider.soundEnabled), teal: teal),
+                              ),
+                              SettingRow(
+                                icon: Icons.bug_report_outlined,
+                                iconColor: gold,
+                                iconBgMode: 'gold',
+                                label: 'Test Notification',
+                                arLabel: 'اختبار الإشعارات',
+                                sublabel: t('Tap to send a test notification now', 'اضغط لإرسال إشعار تجريبي الآن'),
+                                rightWidget: Icon(arabic ? Icons.chevron_left : Icons.chevron_right, size: 16, color: textSecondary),
+                                onTap: () async {
+                                  try {
+                                    await NotificationService.sendTestNotification();
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text(t('Test notification sent! ✅', 'تم إرسال إشعار تجريبي! ✅'))),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text(t('Notification failed: $e', 'فشل الإشعار: $e'))),
+                                      );
+                                    }
+                                  }
+                                },
                                 isLast: true,
                               ),
                             ],

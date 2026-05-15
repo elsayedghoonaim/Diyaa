@@ -40,7 +40,7 @@ class NotificationService {
     await _initTimezone();
 
     const androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('@mipmap/launcher_icon');
 
     const darwinSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
@@ -54,7 +54,7 @@ class NotificationService {
       guid: 'E7B3545A-8A46-4B81-BBCA-747F9EED4E22',
     );
 
-    await _plugin.initialize(
+    final ok = await _plugin.initialize(
       settings: const InitializationSettings(
         android: androidSettings,
         iOS: darwinSettings,
@@ -66,7 +66,7 @@ class NotificationService {
     );
 
     if (_isMobile) await _createAndroidChannels();
-    debugPrint('[Notifications] Initialized. Mobile: $_isMobile');
+    debugPrint('[Notifications] Initialized (ok=$ok). Mobile: $_isMobile');
   }
 
   static Future<void> _initTimezone() async {
@@ -307,6 +307,39 @@ class NotificationService {
       scheduledTime: fireAt,
     );
     debugPrint('[Notifications] Streak warning scheduled for $fireAt.');
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // TEST NOTIFICATION — fires immediately to verify the pipeline works.
+  // Call from settings or on startup for debugging.
+  // ══════════════════════════════════════════════════════════════════════════
+  static Future<void> sendTestNotification() async {
+    try {
+      debugPrint('[Notifications] Sending test notification…');
+      await _plugin.show(
+        id: 99,
+        title: 'Diyaa Test ✅',
+        body: 'If you see this, notifications are working!',
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            _channelPrayer,
+            'Prayer Times',
+            importance: Importance.max,
+            priority: Priority.max,
+            playSound: true,
+            enableVibration: true,
+          ),
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        ),
+      );
+      debugPrint('[Notifications] Test notification sent successfully.');
+    } catch (e) {
+      debugPrint('[Notifications] TEST FAILED: $e');
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════
