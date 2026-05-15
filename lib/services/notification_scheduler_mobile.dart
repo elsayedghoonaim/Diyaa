@@ -11,6 +11,7 @@ Future<void> scheduleNotification(
   required String title,
   required String body,
   required tz.TZDateTime tzTime,
+  DateTimeComponents matchComponents = DateTimeComponents.time,
 }) async {
   // FIX: On Android 14+ (API 34), SCHEDULE_EXACT_ALARM is denied by default.
   // If exact alarms aren't available, fall back to inexact (slightly less
@@ -44,7 +45,7 @@ Future<void> scheduleNotification(
     androidScheduleMode: canExact
         ? AndroidScheduleMode.exactAllowWhileIdle
         : AndroidScheduleMode.inexactAllowWhileIdle,
-    matchDateTimeComponents: DateTimeComponents.time,
+    matchDateTimeComponents: matchComponents,
   );
 }
 

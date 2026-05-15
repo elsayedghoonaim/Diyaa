@@ -11,6 +11,7 @@ Future<void> scheduleNotification(
   required String title,
   required String body,
   required tz.TZDateTime tzTime,
+  DateTimeComponents matchComponents = DateTimeComponents.time,
 }) async {}
 
 Future<void> cancelNotification(

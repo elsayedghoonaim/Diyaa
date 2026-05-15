@@ -18,6 +18,9 @@ class NotificationService {
   // ── IDs ───────────────────────────────────────────────────────────────────
   static const int _idPrayerBase     = 10;
   static const int _idPostPrayerBase = 20;
+  // ID 21 is reserved for post-Dhuhr (Mon–Thu, Sat–Sun daily)
+  // ID 25 is the weekly Jumu'ah post-prayer azkar (Friday only)
+  static const int _idJumuah         = 25;
   static const int _idMorningAzkar   = 30;
   static const int _idEveningAzkar   = 31;
   static const int _idSleepAzkar     = 32;
@@ -279,6 +282,47 @@ class NotificationService {
     );
 
     debugPrint('[Notifications] Scheduled 9 azkar notifications.');
+
+    // Jumu'ah (Friday): schedule a separate weekly post-prayer azkar at
+    // dhuhr + 60 min. On Fridays the khutbah takes ~45–60 min, so
+    // the standard +15 min would fire during the prayer itself.
+    await _scheduleJumuahAzkar(prayers.dhuhr, isArabic: isArabic);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // JUMU'AH  (ID 25) — weekly, Friday only
+  // Fires at dhuhr + 60 min every Friday using dayOfWeekAndTime.
+  // ══════════════════════════════════════════════════════════════════════════
+  static Future<void> _scheduleJumuahAzkar(
+    DateTime dhuhrTime, {required bool isArabic}) async {
+    // Find the next Friday at dhuhr+60min
+    var fireAt = dhuhrTime.add(const Duration(minutes: 60));
+    // DateTime.weekday: Monday=1 … Sunday=7; Friday=5
+    final daysUntilFriday = (5 - fireAt.weekday + 7) % 7;
+    fireAt = fireAt.add(Duration(days: daysUntilFriday == 0 ? 0 : daysUntilFriday));
+    if (fireAt.isBefore(DateTime.now())) {
+      fireAt = fireAt.add(const Duration(days: 7));
+    }
+
+    final tzTime = tz.TZDateTime.from(fireAt, tz.local);
+    try {
+      await scheduler.scheduleNotification(
+        _plugin,
+        id: _idJumuah,
+        channelId: _channelAzkar,
+        channelName: 'Azkar Reminders',
+        title: isArabic ? 'أذكار ما بعد صلاة الجمعة 📿🕌'
+                        : 'Post-Jumu\'ah Azkar 📿🕌',
+        body: isArabic
+            ? 'تقبل الله صلاتكم. لا تنسوا أذكار ما بعد صلاة الجمعة المباركة.'
+            : 'May Allah accept your Jumu\'ah prayer! Time for post-prayer supplications.',
+        tzTime: tzTime,
+        matchComponents: DateTimeComponents.dayOfWeekAndTime,
+      );
+      debugPrint('[Notifications] Jumu\'ah azkar scheduled for $fireAt (weekly Fri).');
+    } catch (e) {
+      debugPrint('[Notifications] ERROR Jumu\'ah id=$_idJumuah: $e');
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -375,6 +419,7 @@ class NotificationService {
 
   static Future<void> cancelAzkarNotifications() async {
     for (int i = 0; i < 5; i++) await _cancelOne(_idPostPrayerBase + i);
+    await _cancelOne(_idJumuah);        // cancel Friday Jumu'ah azkar too
     await _cancelOne(_idMorningAzkar);
     await _cancelOne(_idEveningAzkar);
     await _cancelOne(_idSleepAzkar);
@@ -391,6 +436,7 @@ class NotificationService {
     required String title,
     required String body,
     required DateTime scheduledTime,
+    DateTimeComponents matchComponents = DateTimeComponents.time,
   }) async {
     try {
       var fireAt = scheduledTime;
@@ -402,8 +448,9 @@ class NotificationService {
         _plugin,
         id: id, channelId: channelId, channelName: channelName,
         title: title, body: body, tzTime: tzTime,
+        matchComponents: matchComponents,
       );
-      debugPrint('[Notifications] id=$id scheduled at $fireAt');
+      debugPrint('[Notifications] id=$id scheduled at $fireAt (match=$matchComponents)');
     } catch (e) {
       debugPrint('[Notifications] ERROR id=$id: $e');
     }
