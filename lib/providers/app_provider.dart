@@ -690,7 +690,7 @@ class AppProvider extends ChangeNotifier {
   Future<void> _rescheduleSalahNabi() async {
     try {
       await NotificationService.scheduleSalahNabiReminders(
-        enabled:       _salahNotif && _soundEnabled,
+        enabled:       _salahNotif,
         soundAsset:    _salahSound,
         intervalMinutes: _salahInterval,
         overrideSilent: _salahOverrideSilent,

@@ -368,26 +368,29 @@ class NotificationService {
     final soundFileName = '$soundAsset.mp3';
 
     // Build AndroidNotificationDetails for each slot
-    // Importance.defaultImportance allows sound to play without dropping a heads-up banner
-    // timeoutAfter ensures the notification cleans itself up from the shade after 15 seconds
-    // We append v3 and the overrideSilent flag to the channel ID to bypass Android's channel caching
+    // Importance.high guarantees the custom sound plays on Android 13+
+    // timeoutAfter ensures the heads-up banner cleans itself up after 7 seconds
+    // Channel ID matches the pre-created channels in _createAndroidChannels
     final androidDetails = AndroidNotificationDetails(
-      'diyaa_salah_v3_${soundAsset}_${overrideSilent ? "alarm" : "notif"}',
+      'diyaa_salah_$soundAsset',
       'Al-Salah Ala Al-Nabi',
-      importance: Importance.defaultImportance,
-      priority: Priority.defaultPriority,
+      importance: Importance.high,
+      priority: Priority.high,
       visibility: NotificationVisibility.public,
       playSound: true,
       sound: RawResourceAndroidNotificationSound(soundAsset),
       audioAttributesUsage: overrideSilent
           ? AudioAttributesUsage.alarm
           : AudioAttributesUsage.notification,
+      category: overrideSilent
+          ? AndroidNotificationCategory.alarm
+          : AndroidNotificationCategory.reminder,
       enableVibration: false,
       showWhen: false,
       ongoing: false,
       silent: false,
       icon: '@mipmap/launcher_icon',
-      timeoutAfter: 15000, // Disappears after 15 seconds
+      timeoutAfter: 7000, // Disappears after 7 seconds
     );
 
     const iosDetails = DarwinNotificationDetails(
@@ -519,6 +522,57 @@ class NotificationService {
       debugPrint('[Notifications] Test notification sent successfully.');
     } catch (e) {
       debugPrint('[Notifications] TEST FAILED: $e');
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // TEST SALAH NOTIFICATION
+  // ══════════════════════════════════════════════════════════════════════════
+  static Future<void> sendTestSalahNotification({
+    required bool isArabic,
+    required String soundAsset,
+    required bool overrideSilent,
+  }) async {
+    try {
+      debugPrint('[Notifications] Sending test Salah notification...');
+      final androidDetails = AndroidNotificationDetails(
+        'diyaa_salah_$soundAsset',
+        'Al-Salah Ala Al-Nabi',
+        importance: Importance.high,
+        priority: Priority.high,
+        visibility: NotificationVisibility.public,
+        playSound: true,
+        sound: RawResourceAndroidNotificationSound(soundAsset),
+        audioAttributesUsage: overrideSilent
+            ? AudioAttributesUsage.alarm
+            : AudioAttributesUsage.notification,
+        category: overrideSilent
+            ? AndroidNotificationCategory.alarm
+            : AndroidNotificationCategory.reminder,
+        enableVibration: false,
+        showWhen: false,
+        ongoing: false,
+        silent: false,
+        icon: '@mipmap/launcher_icon',
+        timeoutAfter: 7000,
+      );
+
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: false,
+        presentBadge: false,
+        presentSound: true,
+      );
+
+      await _plugin.show(
+        id: 98,
+        title: 'اللهم صل على محمد',
+        body: ' ',
+        notificationDetails: NotificationDetails(
+            android: androidDetails, iOS: iosDetails),
+      );
+      debugPrint('[Notifications] Test Salah notification sent successfully.');
+    } catch (e) {
+      debugPrint('[Notifications] TEST SALAH FAILED: $e');
     }
   }
 
