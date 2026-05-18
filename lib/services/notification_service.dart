@@ -456,6 +456,15 @@ class NotificationService {
     // and Android 12+ (no SCHEDULE_EXACT_ALARM).
     await requestPermissions();
 
+    // FIX: Write enabled state to native SharedPreferences FIRST, before any
+    // cancellation or scheduling. This ensures SalahSoundReceiver knows the
+    // current state even if the app is killed during the 341-ID cancellation
+    // loop. Without this ordering, remaining native alarms would keep firing
+    // and auto-rescheduling because SharedPreferences still had enabled=true.
+    if (Platform.isAndroid) {
+      await setSalahNabiEnabledNative(enabled);
+    }
+
     // FIX: Cancel ALL possible Salah Nabi IDs (60–400) every time.
     // Previously used _lastSalahSlotCount to only cancel previously-scheduled
     // IDs, but that static variable resets to 0 on process death, leaving
@@ -468,7 +477,7 @@ class NotificationService {
     }
 
     if (!enabled) {
-      debugPrint('[Notifications] Salah Nabi reminders disabled — all IDs cancelled.');
+      debugPrint('[Notifications] Salah Nabi reminders disabled — all IDs cancelled, native prefs updated.');
       return;
     }
 
@@ -544,18 +553,10 @@ class NotificationService {
 
     final details = NotificationDetails(android: androidDetails, iOS: iosDetails);
 
-    // FIX: Check exact-alarm permission ONCE before the loop, not per-slot.
-    // canScheduleExactNotifications() is a platform channel call — calling it
-    // 24+ times in a loop is slow and wasteful since the result doesn't change.
-    final android = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    bool canExact = true;
-    if (android != null) {
-      canExact = await android.canScheduleExactNotifications() ?? false;
-    }
-    final scheduleMode = canExact
-        ? AndroidScheduleMode.exactAllowWhileIdle
-        : AndroidScheduleMode.inexactAllowWhileIdle;
+    // androidScheduleMode is only used on iOS (where it's ignored by the OS
+    // but required by the plugin API). On Android, we use native AlarmManager
+    // alarms which handle their own exact-alarm permission check in MainActivity.
+    const scheduleMode = AndroidScheduleMode.exactAllowWhileIdle;
 
     // Schedule one slot per interval, starting from the next interval boundary
     final now = DateTime.now();
@@ -573,40 +574,55 @@ class NotificationService {
         fireAt = fireAt.add(const Duration(days: 1));
       }
 
-      final tzTime = tz.TZDateTime.from(fireAt, tz.local);
       final id = _idSalahBase + slot;
 
-      try {
-        await _plugin.zonedSchedule(
-          id: id,
-          title: 'اللهم صل على محمد',
-          body: 'صلّوا على النبي ﷺ',
-          scheduledDate: tzTime,
-          notificationDetails: details,
-          androidScheduleMode: scheduleMode,
-          matchDateTimeComponents: DateTimeComponents.time,
-        );
-        // FIX (A6): Also schedule native sound alarm via AlarmManager +
-        // MediaPlayer. This bypasses the unreliable notification channel
-        // sound mechanism and plays the sound directly even when the app
-        // process is dead or in Doze mode.
-        if (soundEnabled && Platform.isAndroid) {
-          await scheduleNativeSalahAlarm(
-            id: id,
-            scheduledTime: fireAt,
-            soundAsset: soundAsset,
-            overrideSilent: overrideSilent,
-          );
+      if (Platform.isAndroid) {
+        // ── Android: Native AlarmManager + MediaPlayer only ──
+        // No zonedSchedule() — this eliminates the unwanted visible notification
+        // in the shade. Sound plays via MediaPlayer in SalahSoundReceiver,
+        // which auto-reschedules daily for ongoing reminders.
+        // When soundEnabled=false: no alarm scheduled (completely silent).
+        if (soundEnabled) {
+          try {
+            await scheduleNativeSalahAlarm(
+              id: id,
+              scheduledTime: fireAt,
+              soundAsset: soundAsset,
+              overrideSilent: overrideSilent,
+              intervalMinutes: interval,
+            );
+            scheduledCount++;
+            debugPrint('[Notifications] Salah slot id=$id native alarm OK.');
+          } catch (e) {
+            debugPrint('[Notifications] Salah slot id=$id native alarm FAILED: $e');
+          }
         }
-        scheduledCount++;
-      } catch (e) {
-        debugPrint('[Notifications] Salah slot id=$id ERROR: $e');
+      } else {
+        // ── iOS/other mobile: zonedSchedule() with notification sound ──
+        // iOS notification sound is reliable. The notification appears in
+        // the shade (expected on iOS for a reminder).
+        final tzTime = tz.TZDateTime.from(fireAt, tz.local);
+        try {
+          await _plugin.zonedSchedule(
+            id: id,
+            title: 'اللهم صل على محمد',
+            body: 'صلّوا على النبي ﷺ',
+            scheduledDate: tzTime,
+            notificationDetails: details,
+            androidScheduleMode: scheduleMode,
+            matchDateTimeComponents: DateTimeComponents.time,
+          );
+          scheduledCount++;
+          debugPrint('[Notifications] Salah slot id=$id zonedSchedule OK.');
+        } catch (e) {
+          debugPrint('[Notifications] Salah slot id=$id zonedSchedule FAILED: $e');
+        }
       }
     }
 
     debugPrint('[Notifications] Scheduled $scheduledCount salah nabi reminders '
         '(every $interval min, channel=$channelId, overrideSilent=$overrideSilent, '
-        'soundEnabled=$soundEnabled, canExact=$canExact).');
+        'soundEnabled=$soundEnabled, platform=${Platform.isAndroid ? "android-native" : "ios-zonedSchedule"}).');
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -812,6 +828,7 @@ class NotificationService {
     required DateTime scheduledTime,
     required String soundAsset,
     required bool overrideSilent,
+    required int intervalMinutes,
   }) async {
     if (!_isMobile || !Platform.isAndroid) return;
     try {
@@ -821,9 +838,11 @@ class NotificationService {
         'scheduledTime': millis,
         'soundAsset': soundAsset,
         'overrideSilent': overrideSilent,
+        'intervalMinutes': intervalMinutes,
       });
       debugPrint('[Notifications] Native salah alarm scheduled: id=$id, '
-          'time=$scheduledTime, sound=$soundAsset, overrideSilent=$overrideSilent');
+          'time=$scheduledTime, sound=$soundAsset, overrideSilent=$overrideSilent, '
+          'interval=$intervalMinutes min');
     } catch (e) {
       debugPrint('[Notifications] Native salah alarm FAILED: id=$id, $e');
     }
@@ -837,6 +856,22 @@ class NotificationService {
       await _alarmChannel.invokeMethod('cancelSalahSoundAlarm', {'id': id});
     } catch (e) {
       debugPrint('[Notifications] Native salah alarm cancel FAILED: id=$id, $e');
+    }
+  }
+
+  /// Write the Salah Nabi enabled state to native SharedPreferences.
+  /// This is read by SalahSoundReceiver at fire time to determine whether
+  /// to play sound and auto-reschedule, or to cancel the alarm chain.
+  /// When enabled=false: SalahSoundReceiver cancels its alarm instead of
+  /// rescheduling, breaking the auto-reschedule chain.
+  /// When enabled=true: SalahSoundReceiver plays sound and reschedules.
+  static Future<void> setSalahNabiEnabledNative(bool enabled) async {
+    if (!_isMobile || !Platform.isAndroid) return;
+    try {
+      await _alarmChannel.invokeMethod('setSalahNabiEnabled', {'enabled': enabled});
+      debugPrint('[Notifications] Native salah enabled state set: $enabled');
+    } catch (e) {
+      debugPrint('[Notifications] Native salah enabled state FAILED: $e');
     }
   }
 

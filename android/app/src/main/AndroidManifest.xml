@@ -98,6 +98,24 @@
             android:enabled="true"
             android:exported="false" />
 
+        <!-- Reschedules native Salah sound alarms after device reboot or app
+             update. When Android reboots, all AlarmManager alarms are lost.
+             Since we skip zonedSchedule() on Android (to avoid the unwanted
+             visible notification), the flutter_local_notifications boot
+             receiver won't reschedule our native alarms. This receiver reads
+             the Salah Nabi configuration from SharedPreferences and
+             reschedules all native alarms. -->
+        <receiver android:name=".SalahBootReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
+
     </application>
 
     <!-- Required for Flutter text processing plugin -->
