@@ -438,10 +438,10 @@ class NotificationService {
       // The notification auto-dismisses naturally; sound file length determines audio duration.
     );
 
-    const iosDetails = DarwinNotificationDetails(
+    final iosDetails = DarwinNotificationDetails(
       presentAlert: false,
       presentBadge: false,
-      presentSound: true,
+      presentSound: soundEnabled, // FIX: was always true — now respects user preference
     );
 
     final details = NotificationDetails(android: androidDetails, iOS: iosDetails);
@@ -579,52 +579,75 @@ class NotificationService {
   // ══════════════════════════════════════════════════════════════════════════
   // TEST SALAH NOTIFICATION
   // ══════════════════════════════════════════════════════════════════════════
+  // FIX: Cross-platform test — always plays audio directly via AudioPlayer
+  // when soundEnabled (works on ALL platforms including Windows), and also
+  // shows the notification on mobile to test the notification channel.
+  // On Windows/desktop, the notification is skipped because custom sounds
+  // aren't supported by flutter_local_notifications on those platforms.
   static Future<void> sendTestSalahNotification({
     required bool isArabic,
     required String soundAsset,
     required bool overrideSilent,
-    required bool soundEnabled, // FIX: now passed through
+    required bool soundEnabled,
   }) async {
     try {
       debugPrint('[Notifications] Sending test Salah notification...');
-      final androidDetails = AndroidNotificationDetails(
-        'diyaa_salah_$soundAsset',
-        'Al-Salah Ala Al-Nabi',
-        importance: Importance.max, // FIX: was Importance.high — mismatch with channel
-        priority: Priority.max,
-        visibility: NotificationVisibility.public,
-        playSound: soundEnabled, // FIX: was always true — now respects user preference
-        sound: soundEnabled
-            ? RawResourceAndroidNotificationSound(soundAsset)
-            : null,
-        audioAttributesUsage: overrideSilent
-            ? AudioAttributesUsage.alarm
-            : AudioAttributesUsage.notification,
-        category: overrideSilent
-            ? AndroidNotificationCategory.alarm
-            : AndroidNotificationCategory.reminder,
-        enableVibration: false,
-        showWhen: false,
-        ongoing: false,
-        silent: !soundEnabled, // FIX: was always false — now controlled by soundEnabled
-        icon: '@mipmap/launcher_icon',
-        // FIX: timeoutAfter removed — was cutting off sound playback after 7 seconds
-      );
 
-      final iosDetails = DarwinNotificationDetails(
-        presentAlert: false,
-        presentBadge: false,
-        presentSound: soundEnabled, // FIX: was always true — now respects user preference
-      );
+      // ── FIX: Always play audio directly via AudioPlayer when soundEnabled.
+      // The notification system's sound playback is unreliable:
+      //   * On Windows, custom notification sounds aren't supported at all
+      //   * On Android, sound can be suppressed by DND/silent mode or missing perms
+      //   * Direct audio playback ensures the user hears the sound immediately.
+      if (soundEnabled) {
+        await _previewPlayer.stop();
+        await _previewPlayer.play(AssetSource('sounds/$soundAsset.mp3'));
+      }
 
-      await _plugin.show(
-        id: 98,
-        title: 'اللهم صل على محمد',
-        body: 'صلّوا على النبي ﷺ', // FIX: was ' ' (whitespace) — risk of OS suppression
-        notificationDetails: NotificationDetails(
-            android: androidDetails, iOS: iosDetails),
-      );
-      debugPrint('[Notifications] Test Salah notification sent successfully.');
+      // ── On mobile, also show the notification to test the notification channel
+      if (_isMobile) {
+        // Ensure permissions are granted before showing the notification
+        await requestPermissions();
+
+        final androidDetails = AndroidNotificationDetails(
+          'diyaa_salah_$soundAsset',
+          'Al-Salah Ala Al-Nabi',
+          importance: Importance.max,
+          priority: Priority.max,
+          visibility: NotificationVisibility.public,
+          playSound: soundEnabled,
+          sound: soundEnabled
+              ? RawResourceAndroidNotificationSound(soundAsset)
+              : null,
+          audioAttributesUsage: overrideSilent
+              ? AudioAttributesUsage.alarm
+              : AudioAttributesUsage.notification,
+          category: overrideSilent
+              ? AndroidNotificationCategory.alarm
+              : AndroidNotificationCategory.reminder,
+          enableVibration: false,
+          showWhen: false,
+          ongoing: false,
+          silent: !soundEnabled,
+          icon: '@mipmap/launcher_icon',
+        );
+
+        final iosDetails = DarwinNotificationDetails(
+          presentAlert: false,
+          presentBadge: false,
+          presentSound: soundEnabled,
+        );
+
+        await _plugin.show(
+          id: 98,
+          title: 'اللهم صل على محمد',
+          body: 'صلّوا على النبي ﷺ',
+          notificationDetails: NotificationDetails(
+              android: androidDetails, iOS: iosDetails),
+        );
+      }
+
+      debugPrint('[Notifications] Test Salah completed '
+          '(soundEnabled=$soundEnabled, platform=${_isMobile ? "mobile" : "desktop"}).');
     } catch (e) {
       debugPrint('[Notifications] TEST SALAH FAILED: $e');
     }
