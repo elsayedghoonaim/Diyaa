@@ -12,6 +12,7 @@ Future<void> scheduleNotification(
   required String body,
   required tz.TZDateTime tzTime,
   DateTimeComponents matchComponents = DateTimeComponents.time,
+  bool playSound = true, // FIX: Signature must match mobile implementation
 }) async {}
 
 Future<void> cancelNotification(

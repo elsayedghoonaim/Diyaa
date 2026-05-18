@@ -443,6 +443,9 @@ class AppProvider extends ChangeNotifier {
   Future<void> _rescheduleNotifications() async {
     if (_prayerInfo == null) return;
     try {
+      // FIX: scheduleAll() now uses selective cancellation (only IDs 10-40),
+      // so Salah Nabi (IDs 60-400) is no longer destroyed by scheduleAll().
+      // soundEnabled is now passed through to scheduleAll() and Salah Nabi.
       await NotificationService.requestPermissions();
       await NotificationService.scheduleAll(
         _prayerInfo!,
@@ -450,6 +453,7 @@ class AppProvider extends ChangeNotifier {
         notifPrayer: _notifPrayer,
         notifAzkar:  _notifAzkar,
         notifStreak: _notifStreak,
+        soundEnabled: _soundEnabled, // FIX: now passed through
         currentStreak: _streak,
       );
       // Also reschedule Al-Salah 'ala Al-Nabi reminders
@@ -628,12 +632,14 @@ class AppProvider extends ChangeNotifier {
     if (!value) {
       try {
         await NotificationService.scheduleStreakWarning(
-            enabled: false, isArabic: _arabicMode, currentStreak: _streak);
+            enabled: false, isArabic: _arabicMode, currentStreak: _streak,
+            soundEnabled: _soundEnabled); // FIX: pass sound preference
       } catch (_) {}
     } else if (_streak > 0) {
       try {
         await NotificationService.scheduleStreakWarning(
-            enabled: true, isArabic: _arabicMode, currentStreak: _streak);
+            enabled: true, isArabic: _arabicMode, currentStreak: _streak,
+            soundEnabled: _soundEnabled); // FIX: pass sound preference
       } catch (_) {}
     }
   }
@@ -694,6 +700,7 @@ class AppProvider extends ChangeNotifier {
         soundAsset:    _salahSound,
         intervalMinutes: _salahInterval,
         overrideSilent: _salahOverrideSilent,
+        soundEnabled:  _soundEnabled, // FIX: now passed through
       );
     } catch (e) {
       debugPrint('[AppProvider] _rescheduleSalahNabi failed: $e');

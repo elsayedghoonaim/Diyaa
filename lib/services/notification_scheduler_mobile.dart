@@ -12,6 +12,7 @@ Future<void> scheduleNotification(
   required String body,
   required tz.TZDateTime tzTime,
   DateTimeComponents matchComponents = DateTimeComponents.time,
+  bool playSound = true, // FIX: Now respects the user's sound preference
 }) async {
   // FIX: On Android 14+ (API 34), SCHEDULE_EXACT_ALARM is denied by default.
   // If exact alarms aren't available, fall back to inexact (slightly less
@@ -23,6 +24,10 @@ Future<void> scheduleNotification(
     canExact = await android.canScheduleExactNotifications() ?? false;
   }
 
+  // FIX: playSound/silent/presentSound now controlled by the playSound
+  // parameter, which is threaded from the user's soundEnabled preference.
+  // Previously these were always true/false, meaning sound played even when
+  // the user had disabled it.
   await plugin.zonedSchedule(
     id: id,
     title: title,
@@ -34,12 +39,14 @@ Future<void> scheduleNotification(
         channelName,
         importance: Importance.high,
         priority: Priority.high,
+        playSound: playSound,
+        silent: !playSound,
         styleInformation: const BigTextStyleInformation(''),
       ),
-      iOS: const DarwinNotificationDetails(
+      iOS: DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
-        presentSound: true,
+        presentSound: playSound,
       ),
     ),
     androidScheduleMode: canExact

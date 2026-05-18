@@ -529,6 +529,7 @@ class _SalahNabiSection extends StatelessWidget {
                   isArabic: arabic,
                   soundAsset: provider.salahSound,
                   overrideSilent: provider.salahOverrideSilent,
+                  soundEnabled: provider.soundEnabled, // FIX: now passed through
                 );
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(

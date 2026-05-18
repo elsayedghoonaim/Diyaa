@@ -32,6 +32,10 @@ class NotificationService {
   static const int _idSalahBase       = 60;
   static const int _idSalahMax        = 400; // Allow up to 341 slots
 
+  // FIX: Track the number of Salah Nabi slots actually scheduled last time.
+  // This avoids cancelling 341 IDs individually when only 24 were scheduled.
+  static int _lastSalahSlotCount = 0;
+
   // ── Channels ──────────────────────────────────────────────────────────────
   static const String _channelPrayer  = 'diyaa_prayer';
   static const String _channelAzkar   = 'diyaa_azkar';
@@ -189,6 +193,7 @@ class NotificationService {
     required bool notifPrayer,
     required bool notifAzkar,
     required bool notifStreak,
+    required bool soundEnabled, // FIX: Now passed through from AppProvider
     int currentStreak = 0,
   }) async {
     if (!_isMobile) {
@@ -196,23 +201,45 @@ class NotificationService {
       return;
     }
 
-    await _cancelAll();
+    // FIX: Selective cancellation — only cancel IDs that scheduleAll() manages.
+    // Previously _cancelAll() cancelled EVERYTHING including Salah Nabi (IDs 60-400),
+    // which meant Salah Nabi was destroyed and had to be rescheduled separately.
+    // If that separate reschedule failed, Salah Nabi was permanently lost.
+    // Now we only cancel the 15 IDs we actually manage, leaving Salah Nabi intact.
+    await _cancelScheduleAllIds();
 
-    if (notifPrayer) await _schedulePrayerTimes(prayers, isArabic: isArabic);
-    if (notifAzkar)  await _scheduleAzkarReminders(prayers, isArabic: isArabic);
+    if (notifPrayer) await _schedulePrayerTimes(prayers, isArabic: isArabic, soundEnabled: soundEnabled);
+    if (notifAzkar)  await _scheduleAzkarReminders(prayers, isArabic: isArabic, soundEnabled: soundEnabled);
 
     await scheduleStreakWarning(
       enabled: notifStreak,
       isArabic: isArabic,
       currentStreak: currentStreak,
+      soundEnabled: soundEnabled, // FIX: thread sound preference to streak notifications
     );
+  }
+
+  /// FIX: Selective cancellation — only IDs managed by scheduleAll().
+  /// Prayer IDs 10-14, Azkar IDs 20-24/25/30-33, Streak ID 40.
+  /// Salah Nabi IDs 60-400 are NOT touched here.
+  static Future<void> _cancelScheduleAllIds() async {
+    for (int i = 0; i < 5; i++) { await _cancelOne(_idPrayerBase + i); }
+    for (int i = 0; i < 5; i++) { await _cancelOne(_idPostPrayerBase + i); }
+    await _cancelOne(_idJumuah);
+    await _cancelOne(_idMorningAzkar);
+    await _cancelOne(_idEveningAzkar);
+    await _cancelOne(_idSleepAzkar);
+    await _cancelOne(_idNightAzkar);
+    await _cancelOne(_idStreakWarning);
+    debugPrint('[Notifications] Cancelled 15 scheduleAll-managed IDs '
+        '(Salah Nabi untouched).');
   }
 
   // ══════════════════════════════════════════════════════════════════════════
   // PRAYER  (IDs 10–14) — no emojis
   // ══════════════════════════════════════════════════════════════════════════
   static Future<void> _schedulePrayerTimes(
-    PrayerInfo prayers, {required bool isArabic}) async {
+    PrayerInfo prayers, {required bool isArabic, required bool soundEnabled}) async {
     final list = [
       (id: _idPrayerBase + 0, time: prayers.fajr,    ar: 'الفجر',  en: 'Fajr'),
       (id: _idPrayerBase + 1, time: prayers.dhuhr,   ar: 'الظهر',  en: 'Dhuhr'),
@@ -229,6 +256,7 @@ class NotificationService {
             ? 'أرحنا بها يا بلال. لا تنس أداء الصلاة في وقتها.'
             : "Time to pray. Don't forget to perform your prayer on time.",
         scheduledTime: p.time,
+        soundEnabled: soundEnabled, // FIX: thread sound preference
       );
     }
     debugPrint('[Notifications] Scheduled 5 prayer notifications.');
@@ -238,7 +266,7 @@ class NotificationService {
   // AZKAR  (IDs 20–24, 30–33) — no emojis
   // ══════════════════════════════════════════════════════════════════════════
   static Future<void> _scheduleAzkarReminders(
-    PrayerInfo prayers, {required bool isArabic}) async {
+    PrayerInfo prayers, {required bool isArabic, required bool soundEnabled}) async {
     final list = [
       (time: prayers.fajr,    ar: 'الفجر',  en: 'Fajr'),
       (time: prayers.dhuhr,   ar: 'الظهر',  en: 'Dhuhr'),
@@ -258,6 +286,7 @@ class NotificationService {
             ? 'تقبل الله صلاتك! لا تنس أذكار ما بعد الصلاة.'
             : 'May Allah accept your prayer! Time for post-prayer supplications.',
         scheduledTime: p.time.add(const Duration(minutes: 15)),
+        soundEnabled: soundEnabled, // FIX: thread sound preference
       );
     }
 
@@ -268,6 +297,7 @@ class NotificationService {
       body:  isArabic ? 'ابدأ يومك بنور الذكر. حان وقت أذكار الصباح.'
                       : 'Start your day with remembrance. Time for Morning Azkar.',
       scheduledTime: prayers.fajr.add(const Duration(minutes: 30)),
+      soundEnabled: soundEnabled,
     );
 
     await _schedule(
@@ -277,6 +307,7 @@ class NotificationService {
       body:  isArabic ? 'لا تنس أذكار المساء. اجعل ختام يومك ذكراً.'
                       : 'Protect yourself until morning. Time for Evening Azkar.',
       scheduledTime: prayers.asr.add(const Duration(minutes: 30)),
+      soundEnabled: soundEnabled,
     );
 
     await _schedule(
@@ -286,6 +317,7 @@ class NotificationService {
       body:  isArabic ? 'اختم يومك بذكر الله لتنام في طمأنينة.'
                       : 'End your day with remembrance of Allah for peaceful sleep.',
       scheduledTime: prayers.isha.add(const Duration(minutes: 30)),
+      soundEnabled: soundEnabled,
     );
 
     await _schedule(
@@ -295,18 +327,19 @@ class NotificationService {
       body:  isArabic ? 'إن ربك ينزل إلى السماء الدنيا في هذا الوقت، فاذكره وادعه.'
                       : 'The last third of the night is a time of blessing. Make dua.',
       scheduledTime: prayers.fajr.subtract(const Duration(minutes: 30)),
+      soundEnabled: soundEnabled,
     );
 
     debugPrint('[Notifications] Scheduled 9 azkar notifications.');
 
-    await _scheduleJumuahAzkar(prayers.dhuhr, isArabic: isArabic);
+    await _scheduleJumuahAzkar(prayers.dhuhr, isArabic: isArabic, soundEnabled: soundEnabled);
   }
 
   // ══════════════════════════════════════════════════════════════════════════
   // JUMU'AH  (ID 25) — no emojis
   // ══════════════════════════════════════════════════════════════════════════
   static Future<void> _scheduleJumuahAzkar(
-    DateTime dhuhrTime, {required bool isArabic}) async {
+    DateTime dhuhrTime, {required bool isArabic, required bool soundEnabled}) async {
     var fireAt = dhuhrTime.add(const Duration(minutes: 60));
     final daysUntilFriday = (5 - fireAt.weekday + 7) % 7;
     fireAt = fireAt.add(Duration(days: daysUntilFriday == 0 ? 0 : daysUntilFriday));
@@ -328,6 +361,7 @@ class NotificationService {
             : "May Allah accept your Jumu'ah prayer! Time for post-prayer supplications.",
         tzTime: tzTime,
         matchComponents: DateTimeComponents.dayOfWeekAndTime,
+        playSound: soundEnabled, // FIX: thread sound preference
       );
       debugPrint("[Notifications] Jumu'ah azkar scheduled for $fireAt (weekly Fri).");
     } catch (e) {
@@ -346,15 +380,22 @@ class NotificationService {
     required String soundAsset,
     required int intervalMinutes,
     required bool overrideSilent,
+    required bool soundEnabled, // FIX: Now passed through from AppProvider
   }) async {
     if (!_isMobile) return;
 
-    // Cancel all existing salah slots
-    for (int i = _idSalahBase; i <= _idSalahMax; i++) {
+    // FIX: Optimized cancellation — only cancel IDs that were actually scheduled
+    // last time (tracked via _lastSalahSlotCount), not all 341 possible IDs.
+    // On first run (_lastSalahSlotCount == 0), cancel a safe default range.
+    final cancelUpTo = _lastSalahSlotCount > 0
+        ? _idSalahBase + _lastSalahSlotCount
+        : _idSalahBase + 48; // Safe default: 48 slots = 30-min intervals
+    for (int i = _idSalahBase; i < cancelUpTo; i++) {
       await _cancelOne(i);
     }
 
     if (!enabled) {
+      _lastSalahSlotCount = 0;
       debugPrint('[Notifications] Salah Nabi reminders disabled — cancelled.');
       return;
     }
@@ -367,18 +408,21 @@ class NotificationService {
 
     final soundFileName = '$soundAsset.mp3';
 
-    // Build AndroidNotificationDetails for each slot
-    // Importance.high guarantees the custom sound plays on Android 13+
-    // timeoutAfter ensures the heads-up banner cleans itself up after 7 seconds
-    // Channel ID matches the pre-created channels in _createAndroidChannels
+    // FIX: Build AndroidNotificationDetails with proper settings:
+    // - Importance.max matches the pre-created channel (was Importance.high — mismatch)
+    // - playSound controlled by soundEnabled (was always true — disconnected from preference)
+    // - timeoutAfter removed (was 7000ms — cut off sound playback prematurely)
+    // - silent flag controlled by soundEnabled (was always false)
     final androidDetails = AndroidNotificationDetails(
       'diyaa_salah_$soundAsset',
       'Al-Salah Ala Al-Nabi',
-      importance: Importance.high,
-      priority: Priority.high,
+      importance: Importance.max, // FIX: was Importance.high — mismatch with channel
+      priority: Priority.max,
       visibility: NotificationVisibility.public,
-      playSound: true,
-      sound: RawResourceAndroidNotificationSound(soundAsset),
+      playSound: soundEnabled, // FIX: was always true — now respects user preference
+      sound: soundEnabled
+          ? RawResourceAndroidNotificationSound(soundAsset)
+          : null, // FIX: only set custom sound when soundEnabled is true
       audioAttributesUsage: overrideSilent
           ? AudioAttributesUsage.alarm
           : AudioAttributesUsage.notification,
@@ -388,9 +432,10 @@ class NotificationService {
       enableVibration: false,
       showWhen: false,
       ongoing: false,
-      silent: false,
+      silent: !soundEnabled, // FIX: was always false — now controlled by soundEnabled
       icon: '@mipmap/launcher_icon',
-      timeoutAfter: 7000, // Disappears after 7 seconds
+      // FIX: timeoutAfter removed — was cutting off sound playback after 7 seconds.
+      // The notification auto-dismisses naturally; sound file length determines audio duration.
     );
 
     const iosDetails = DarwinNotificationDetails(
@@ -431,7 +476,7 @@ class NotificationService {
         await _plugin.zonedSchedule(
           id: id,
           title: 'اللهم صل على محمد',
-          body: ' ', // Single space instead of empty string to prevent OS suppression
+          body: 'صلّوا على النبي ﷺ', // FIX: was ' ' (whitespace) — risk of OS suppression on Android 13+
           scheduledDate: tzTime,
           notificationDetails: details,
           androidScheduleMode: canExact
@@ -445,8 +490,12 @@ class NotificationService {
       }
     }
 
+    // FIX: Track the number of slots scheduled for efficient cancellation next time
+    _lastSalahSlotCount = scheduledCount;
+
     debugPrint('[Notifications] Scheduled $scheduledCount salah nabi reminders '
-        '(every $interval min, sound=$soundFileName, overrideSilent=$overrideSilent).');
+        '(every $interval min, sound=$soundFileName, overrideSilent=$overrideSilent, '
+        'soundEnabled=$soundEnabled).');
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -456,6 +505,7 @@ class NotificationService {
     required bool enabled,
     required bool isArabic,
     required int currentStreak,
+    required bool soundEnabled, // FIX: thread sound preference
   }) async {
     if (!_isMobile) return;
     await _cancelOne(_idStreakWarning);
@@ -473,6 +523,7 @@ class NotificationService {
       body:  isArabic ? 'لا تزال أذكار اليوم في انتظارك. حافظ على سلسلتك!'
                       : 'Your daily Azkar are waiting. Keep your streak alive!',
       scheduledTime: fireAt,
+      soundEnabled: soundEnabled, // FIX: thread sound preference
     );
     debugPrint('[Notifications] Streak warning scheduled for $fireAt.');
   }
@@ -532,17 +583,20 @@ class NotificationService {
     required bool isArabic,
     required String soundAsset,
     required bool overrideSilent,
+    required bool soundEnabled, // FIX: now passed through
   }) async {
     try {
       debugPrint('[Notifications] Sending test Salah notification...');
       final androidDetails = AndroidNotificationDetails(
         'diyaa_salah_$soundAsset',
         'Al-Salah Ala Al-Nabi',
-        importance: Importance.high,
-        priority: Priority.high,
+        importance: Importance.max, // FIX: was Importance.high — mismatch with channel
+        priority: Priority.max,
         visibility: NotificationVisibility.public,
-        playSound: true,
-        sound: RawResourceAndroidNotificationSound(soundAsset),
+        playSound: soundEnabled, // FIX: was always true — now respects user preference
+        sound: soundEnabled
+            ? RawResourceAndroidNotificationSound(soundAsset)
+            : null,
         audioAttributesUsage: overrideSilent
             ? AudioAttributesUsage.alarm
             : AudioAttributesUsage.notification,
@@ -552,21 +606,21 @@ class NotificationService {
         enableVibration: false,
         showWhen: false,
         ongoing: false,
-        silent: false,
+        silent: !soundEnabled, // FIX: was always false — now controlled by soundEnabled
         icon: '@mipmap/launcher_icon',
-        timeoutAfter: 7000,
+        // FIX: timeoutAfter removed — was cutting off sound playback after 7 seconds
       );
 
-      const iosDetails = DarwinNotificationDetails(
+      final iosDetails = DarwinNotificationDetails(
         presentAlert: false,
         presentBadge: false,
-        presentSound: true,
+        presentSound: soundEnabled, // FIX: was always true — now respects user preference
       );
 
       await _plugin.show(
         id: 98,
         title: 'اللهم صل على محمد',
-        body: ' ',
+        body: 'صلّوا على النبي ﷺ', // FIX: was ' ' (whitespace) — risk of OS suppression
         notificationDetails: NotificationDetails(
             android: androidDetails, iOS: iosDetails),
       );
@@ -595,8 +649,8 @@ class NotificationService {
   // ══════════════════════════════════════════════════════════════════════════
   // CANCEL
   // ══════════════════════════════════════════════════════════════════════════
-  static Future<void> _cancelAll() async =>
-      scheduler.cancelAllNotifications(_plugin);
+  // NOTE: _cancelAll() removed — scheduleAll() now uses selective cancellation
+  // (_cancelScheduleAllIds) to avoid destroying Salah Nabi notifications.
 
   static Future<void> _cancelOne(int id) async =>
       scheduler.cancelNotification(_plugin, id);
@@ -625,6 +679,7 @@ class NotificationService {
     required String body,
     required DateTime scheduledTime,
     DateTimeComponents matchComponents = DateTimeComponents.time,
+    bool soundEnabled = true, // FIX: thread sound preference to scheduler
   }) async {
     try {
       var fireAt = scheduledTime;
@@ -637,6 +692,7 @@ class NotificationService {
         id: id, channelId: channelId, channelName: channelName,
         title: title, body: body, tzTime: tzTime,
         matchComponents: matchComponents,
+        playSound: soundEnabled, // FIX: pass sound preference to scheduler
       );
       debugPrint('[Notifications] id=$id scheduled at $fireAt (match=$matchComponents)');
     } catch (e) {
