@@ -752,9 +752,9 @@ class _SessionCard extends StatelessWidget {
                       builder: (context) {
                         if (dynamicState == 'done') {
                           final phrases = [
-                            (en: "May Allah Accept 🤍", ar: "تقبل الله 🤍"),
-                            (en: "Alhamdulillah 🌟", ar: "الحمد لله 🌟"),
-                            (en: "Reward Written 📜", ar: "كُتب الأجر 📜"),
+                            (en: "May Allah Accept", ar: "تقبل الله"),
+                            (en: "Alhamdulillah", ar: "الحمد لله"),
+                            (en: "Reward Written Inshallah", ar: "كُتب الأجر إن شاء الله"),
                           ];
                           // Use sessionId hash to pick a consistent phrase for this session
                           final idx = session.jsonId.hashCode % phrases.length;

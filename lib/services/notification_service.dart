@@ -36,7 +36,7 @@ class NotificationService {
   static const String _channelPrayer  = 'diyaa_prayer';
   static const String _channelAzkar   = 'diyaa_azkar';
   static const String _channelStreak  = 'diyaa_streak';
-  static const String _channelSalah   = 'diyaa_salah';
+  static const String _channelSalah   = 'diyaa_salah_v2';
 
   static bool get _isMobile =>
       !kIsWeb && !Platform.isWindows && !Platform.isLinux;
@@ -118,11 +118,11 @@ class NotificationService {
         importance: Importance.defaultImportance,
         playSound: false, enableVibration: false,
       ),
-      // Al-Salah channel — min importance keeps it invisible in shade
+      // Al-Salah channel — max importance ensures sound plays
       const AndroidNotificationChannel(
         _channelSalah, 'Al-Salah Ala Al-Nabi',
         description: 'Periodic Al-Salah Ala Al-Nabi sound reminders',
-        importance: Importance.min,
+        importance: Importance.max,
         playSound: true,
         enableVibration: false,
         showBadge: false,
@@ -359,13 +359,13 @@ class NotificationService {
     final soundFileName = '$soundAsset.mp3';
 
     // Build AndroidNotificationDetails for each slot
-    // Importance.min + Visibility.secret = hidden from shade, status bar
+    // Importance.max ensures the OS permits the sound to play
     // AudioAttributesUsage.alarm bypasses silent/DND when overrideSilent=true
     final androidDetails = AndroidNotificationDetails(
       _channelSalah,
       'Al-Salah Ala Al-Nabi',
-      importance: Importance.min,
-      priority: Priority.min,
+      importance: Importance.max,
+      priority: Priority.max,
       visibility: NotificationVisibility.secret,
       playSound: true,
       sound: RawResourceAndroidNotificationSound(soundAsset),
