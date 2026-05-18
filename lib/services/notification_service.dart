@@ -28,9 +28,9 @@ class NotificationService {
   static const int _idNightAzkar      = 33;
   static const int _idStreakWarning   = 40;
 
-  // Al-Salah 'ala Al-Nabi IDs — up to 48 slots (every 30 min across 24h)
+  // Al-Salah 'ala Al-Nabi IDs — expanded to handle custom intervals down to 1-5 mins
   static const int _idSalahBase       = 60;
-  static const int _idSalahMax        = 107;
+  static const int _idSalahMax        = 400; // Allow up to 341 slots
 
   // ── Channels ──────────────────────────────────────────────────────────────
   static const String _channelPrayer  = 'diyaa_prayer';
@@ -350,8 +350,8 @@ class NotificationService {
       return;
     }
 
-    // Validate interval (30, 60, 90, 120)
-    final interval = intervalMinutes.clamp(30, 120);
+    // Validate interval (minimum 1 minute, max 24 hours)
+    final interval = intervalMinutes.clamp(1, 1440);
     // Number of daily slots
     final slotsPerDay = (24 * 60) ~/ interval;
     final totalSlots = slotsPerDay.clamp(0, _idSalahMax - _idSalahBase + 1);
