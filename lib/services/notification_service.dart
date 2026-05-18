@@ -36,7 +36,6 @@ class NotificationService {
   static const String _channelPrayer  = 'diyaa_prayer';
   static const String _channelAzkar   = 'diyaa_azkar';
   static const String _channelStreak  = 'diyaa_streak';
-  static const String _channelSalah   = 'diyaa_salah_v2';
 
   static bool get _isMobile =>
       !kIsWeb && !Platform.isWindows && !Platform.isLinux;
@@ -118,12 +117,22 @@ class NotificationService {
         importance: Importance.defaultImportance,
         playSound: false, enableVibration: false,
       ),
-      // Al-Salah channel — max importance ensures sound plays
+      // Al-Salah channels — max importance ensures sound plays
       const AndroidNotificationChannel(
-        _channelSalah, 'Al-Salah Ala Al-Nabi',
+        'diyaa_salah_salah_enhanced', 'Al-Salah Ala Al-Nabi (Al-Naqshabandi)',
         description: 'Periodic Al-Salah Ala Al-Nabi sound reminders',
         importance: Importance.max,
         playSound: true,
+        sound: RawResourceAndroidNotificationSound('salah_enhanced'),
+        enableVibration: false,
+        showBadge: false,
+      ),
+      const AndroidNotificationChannel(
+        'diyaa_salah_salah_nabi', 'Al-Salah Ala Al-Nabi (Classic)',
+        description: 'Periodic Al-Salah Ala Al-Nabi sound reminders',
+        importance: Importance.max,
+        playSound: true,
+        sound: RawResourceAndroidNotificationSound('salah_nabi'),
         enableVibration: false,
         showBadge: false,
       ),
@@ -362,7 +371,7 @@ class NotificationService {
     // Importance.max ensures the OS permits the sound to play
     // AudioAttributesUsage.alarm bypasses silent/DND when overrideSilent=true
     final androidDetails = AndroidNotificationDetails(
-      _channelSalah,
+      'diyaa_salah_$soundAsset',
       'Al-Salah Ala Al-Nabi',
       importance: Importance.max,
       priority: Priority.max,
