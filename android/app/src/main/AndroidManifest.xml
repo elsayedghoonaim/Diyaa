@@ -88,6 +88,16 @@
              without this entry; it registers its own service internally
              via its AAR manifest merger. -->
 
+        <!-- ── Salah sound receiver ──────────────────────────────────────── -->
+        <!-- BroadcastReceiver that plays the Salah 'ala Al-Nabi sound via
+             MediaPlayer when a native AlarmManager alarm fires. This is a
+             fallback for the unreliable notification channel sound mechanism.
+             The alarm is scheduled via MethodChannel from Dart and fires even
+             in Doze mode (setExactAndAllowWhileIdle). -->
+        <receiver android:name=".SalahSoundReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
     </application>
 
     <!-- Required for Flutter text processing plugin -->

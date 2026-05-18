@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -36,6 +37,12 @@ class NotificationService {
   static const String _channelPrayer  = 'diyaa_prayer';
   static const String _channelAzkar   = 'diyaa_azkar';
   static const String _channelStreak  = 'diyaa_streak';
+
+  // ── Native Alarm MethodChannel ─────────────────────────────────────────────
+  // FIX (A5): MethodChannel for native Android AlarmManager + MediaPlayer.
+  // Bypasses the unreliable notification channel sound mechanism for scheduled
+  // reminders by playing the sound directly via native MediaPlayer.
+  static const MethodChannel _alarmChannel = MethodChannel('diyaa_alarm_channel');
 
   static bool get _isMobile =>
       !kIsWeb && !Platform.isWindows && !Platform.isLinux;
@@ -98,6 +105,23 @@ class NotificationService {
         AndroidFlutterLocalNotificationsPlugin>();
     if (android == null) return;
 
+    // FIX (A1): Delete Salah channels before recreating them.
+    // Android doesn't allow changing sound/audioAttributes on existing
+    // channels — the only way to update a channel's configuration is to
+    // delete it and recreate it. This ensures channels always have the
+    // correct sound even if they were previously created with different
+    // settings (e.g., wrong audioAttributesUsage or missing custom sound).
+    for (final channelId in [
+      'diyaa_salah_salah_enhanced',
+      'diyaa_salah_salah_nabi',
+      'diyaa_salah_silent',
+      // FIX (A2): Also delete alarm-level channels before recreating
+      'diyaa_salah_salah_enhanced_alarm',
+      'diyaa_salah_salah_nabi_alarm',
+    ]) {
+      await android.deleteNotificationChannel(channelId: channelId);
+    }
+
     for (final ch in [
       const AndroidNotificationChannel(
         _channelPrayer, 'Prayer Times',
@@ -119,8 +143,7 @@ class NotificationService {
       ),
       // Al-Salah channels — Importance.high (level 4) plays sound reliably
       // without requiring USE_FULL_SCREEN_INTENT permission (which Importance.max
-      // level 5 would need on Android 11+). overrideSilent + audioAttributesUsage
-      // alarm bypasses DND regardless of channel importance level.
+      // level 5 would need on Android 11+).
       const AndroidNotificationChannel(
         'diyaa_salah_salah_enhanced', 'Al-Salah Ala Al-Nabi (Al-Naqshabandi)',
         description: 'Periodic Al-Salah Ala Al-Nabi sound reminders',
@@ -139,7 +162,35 @@ class NotificationService {
         enableVibration: false,
         showBadge: false,
       ),
-      // FIX: Silent channel for when soundEnabled=false.
+      // FIX (A2): Alarm-level channels for overrideSilent.
+      // These channels have audioAttributesUsage: alarm which allows them
+      // to bypass DND/silent mode on Android. When overrideSilent=true,
+      // notifications are routed to these channels instead of the normal ones.
+      // The channel sound is the same as their normal counterparts, but the
+      // alarm audio attribute ensures the sound plays even in DND/silent mode.
+      const AndroidNotificationChannel(
+        'diyaa_salah_salah_enhanced_alarm',
+        'Al-Salah Ala Al-Nabi (Al-Naqshabandi) — Alarm',
+        description: 'Periodic Al-Salah Ala Al-Nabi sound reminders (bypasses silent mode)',
+        importance: Importance.high,
+        playSound: true,
+        sound: RawResourceAndroidNotificationSound('salah_enhanced'),
+        audioAttributesUsage: AudioAttributesUsage.alarm,
+        enableVibration: false,
+        showBadge: false,
+      ),
+      const AndroidNotificationChannel(
+        'diyaa_salah_salah_nabi_alarm',
+        'Al-Salah Ala Al-Nabi (Classic) — Alarm',
+        description: 'Periodic Al-Salah Ala Al-Nabi sound reminders (bypasses silent mode)',
+        importance: Importance.high,
+        playSound: true,
+        sound: RawResourceAndroidNotificationSound('salah_nabi'),
+        audioAttributesUsage: AudioAttributesUsage.alarm,
+        enableVibration: false,
+        showBadge: false,
+      ),
+      // Silent channel for when soundEnabled=false.
       // On Android 8+ (API 26+), notification channel sound takes precedence
       // over per-notification playSound/silent flags. A channel configured with
       // playSound:true + custom sound will ALWAYS play that sound regardless of
@@ -157,7 +208,7 @@ class NotificationService {
     ]) {
       await android.createNotificationChannel(ch);
     }
-    debugPrint('[Notifications] Android channels created (6 total, incl. silent salah).');
+    debugPrint('[Notifications] Android channels created (8 total, incl. silent salah + alarm channels).');
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -410,8 +461,10 @@ class NotificationService {
     // IDs, but that static variable resets to 0 on process death, leaving
     // orphaned notifications firing at old times after app restart.
     // Cancelling 341 IDs is fast (~1ms each) and guarantees no orphans.
+    // FIX (A7): Also cancel native sound alarms for each Salah Nabi ID.
     for (int i = _idSalahBase; i <= _idSalahMax; i++) {
       await _cancelOne(i);
+      await cancelNativeSalahAlarm(i);
     }
 
     if (!enabled) {
@@ -425,34 +478,47 @@ class NotificationService {
     final slotsPerDay = (24 * 60) ~/ interval;
     final totalSlots = slotsPerDay.clamp(0, _idSalahMax - _idSalahBase + 1);
 
-    // FIX: On Android 8+ (API 26+), notification channel sound takes precedence
+    // FIX (A3): On Android 8+ (API 26+), notification channel sound takes precedence
     // over per-notification playSound/silent flags. When soundEnabled=false,
     // we must use the silent channel ('diyaa_salah_silent') which has no sound
     // configured at the channel level. When soundEnabled=true, we use the
-    // per-sound channel which has the custom sound configured.
+    // per-sound channel. When overrideSilent=true, we use the alarm-level
+    // channel which has audioAttributesUsage:alarm to bypass DND/silent mode.
     final channelId = soundEnabled
-        ? 'diyaa_salah_$soundAsset'
+        ? (overrideSilent ? 'diyaa_salah_${soundAsset}_alarm' : 'diyaa_salah_$soundAsset')
         : 'diyaa_salah_silent';
     final channelName = soundEnabled
-        ? 'Al-Salah Ala Al-Nabi'
+        ? (overrideSilent
+            ? 'Al-Salah Ala Al-Nabi — Alarm'
+            : 'Al-Salah Ala Al-Nabi')
         : 'Al-Salah Ala Al-Nabi (Silent)';
 
     // Build notification details — channel selection handles sound on Android 8+.
     // For Android < 8 and iOS, per-notification flags still work.
+    // FIX (A3): channelAction.update forces the plugin to update the channel
+    // at fire time, ensuring the correct sound configuration is used.
+    // Priority.high (not Priority.max) for consistency with test path and
+    // to avoid USE_FULL_SCREEN_INTENT permission requirement on Android 11+.
     final androidDetails = AndroidNotificationDetails(
       channelId,
       channelName,
       importance: soundEnabled ? Importance.high : Importance.min,
-      priority: soundEnabled ? Priority.max : Priority.min,
+      priority: soundEnabled ? Priority.high : Priority.min,
+      channelAction: AndroidNotificationChannelAction.update,
       // FIX: Always use Visibility.secret for Salah Nabi — this is a periodic
       // sound reminder (every 5-60 min). Visibility.public would fill the shade
       // with visible notifications. Visibility.secret hides the content while
       // still allowing the Importance.high channel to play sound.
       visibility: NotificationVisibility.secret,
-      playSound: soundEnabled,
-      sound: soundEnabled
-          ? RawResourceAndroidNotificationSound(soundAsset)
-          : null,
+      // FIX: Disable notification channel sound for scheduled Salah on Android.
+      // The native MediaPlayer (via SalahSoundReceiver) handles sound playback
+      // reliably. The notification channel sound is unreliable (the whole reason
+      // for the native alarm fix). Setting playSound:false + silent:true + sound:null
+      // prevents the channel from playing sound, avoiding overlap with MediaPlayer.
+      // The notification still appears visually (title, body, icon) via the channel's
+      // importance level and other properties.
+      playSound: false,
+      sound: null,
       audioAttributesUsage: overrideSilent
           ? AudioAttributesUsage.alarm
           : AudioAttributesUsage.notification,
@@ -462,7 +528,7 @@ class NotificationService {
       enableVibration: false,
       showWhen: false,
       ongoing: false,
-      silent: !soundEnabled,
+      silent: true,
       icon: '@mipmap/launcher_icon',
     );
 
@@ -520,6 +586,18 @@ class NotificationService {
           androidScheduleMode: scheduleMode,
           matchDateTimeComponents: DateTimeComponents.time,
         );
+        // FIX (A6): Also schedule native sound alarm via AlarmManager +
+        // MediaPlayer. This bypasses the unreliable notification channel
+        // sound mechanism and plays the sound directly even when the app
+        // process is dead or in Doze mode.
+        if (soundEnabled && Platform.isAndroid) {
+          await scheduleNativeSalahAlarm(
+            id: id,
+            scheduledTime: fireAt,
+            soundAsset: soundAsset,
+            overrideSilent: overrideSilent,
+          );
+        }
         scheduledCount++;
       } catch (e) {
         debugPrint('[Notifications] Salah slot id=$id ERROR: $e');
@@ -641,21 +719,25 @@ class NotificationService {
         // Ensure permissions are granted before showing the notification
         await requestPermissions();
 
-        // FIX: Use silent channel when soundEnabled=false (same logic as
-        // scheduleSalahNabiReminders — channel sound overrides per-notification
-        // flags on Android 8+). Importance.high avoids USE_FULL_SCREEN_INTENT
-        // permission requirement. Visibility.secret hides content in shade.
+        // FIX (A4): Use alarm-level channel when overrideSilent=true,
+        // same as scheduleSalahNabiReminders(). Also use channelAction.update
+        // to force channel update at fire time. Importance.high avoids
+        // USE_FULL_SCREEN_INTENT permission requirement. Visibility.secret
+        // hides content in shade.
         final testChannelId = soundEnabled
-            ? 'diyaa_salah_$soundAsset'
+            ? (overrideSilent ? 'diyaa_salah_${soundAsset}_alarm' : 'diyaa_salah_$soundAsset')
             : 'diyaa_salah_silent';
         final testChannelName = soundEnabled
-            ? 'Al-Salah Ala Al-Nabi'
+            ? (overrideSilent
+                ? 'Al-Salah Ala Al-Nabi — Alarm'
+                : 'Al-Salah Ala Al-Nabi')
             : 'Al-Salah Ala Al-Nabi (Silent)';
         final androidDetails = AndroidNotificationDetails(
           testChannelId,
           testChannelName,
           importance: soundEnabled ? Importance.high : Importance.min,
           priority: soundEnabled ? Priority.high : Priority.min,
+          channelAction: AndroidNotificationChannelAction.update,
           visibility: NotificationVisibility.secret,
           playSound: soundEnabled,
           sound: soundEnabled
@@ -710,6 +792,52 @@ class NotificationService {
       channelId: _channelStreak, channelName: 'Streak & Milestones',
     );
     debugPrint('[Notifications] Milestone shown: $title');
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // NATIVE ALARM SCHEDULING  (A5, A6, A7)
+  // ══════════════════════════════════════════════════════════════════════════
+  // FIX (A5): MethodChannel methods for native Android AlarmManager +
+  // MediaPlayer fallback. The notification channel sound mechanism is
+  // unreliable for scheduled reminders (Doze mode, process death, channel
+  // config mismatches). These methods schedule a native AlarmManager alarm
+  // that fires a BroadcastReceiver which plays the sound via MediaPlayer
+  // directly, bypassing the notification channel entirely.
+
+  /// Schedule a native Android alarm that plays the Salah sound via
+  /// MediaPlayer when the alarm fires. This is a fallback for the
+  /// unreliable notification channel sound mechanism.
+  static Future<void> scheduleNativeSalahAlarm({
+    required int id,
+    required DateTime scheduledTime,
+    required String soundAsset,
+    required bool overrideSilent,
+  }) async {
+    if (!_isMobile || !Platform.isAndroid) return;
+    try {
+      final millis = scheduledTime.millisecondsSinceEpoch;
+      await _alarmChannel.invokeMethod('scheduleSalahSoundAlarm', {
+        'id': id,
+        'scheduledTime': millis,
+        'soundAsset': soundAsset,
+        'overrideSilent': overrideSilent,
+      });
+      debugPrint('[Notifications] Native salah alarm scheduled: id=$id, '
+          'time=$scheduledTime, sound=$soundAsset, overrideSilent=$overrideSilent');
+    } catch (e) {
+      debugPrint('[Notifications] Native salah alarm FAILED: id=$id, $e');
+    }
+  }
+
+  /// Cancel a native Android alarm previously scheduled via
+  /// [scheduleNativeSalahAlarm].
+  static Future<void> cancelNativeSalahAlarm(int id) async {
+    if (!_isMobile || !Platform.isAndroid) return;
+    try {
+      await _alarmChannel.invokeMethod('cancelSalahSoundAlarm', {'id': id});
+    } catch (e) {
+      debugPrint('[Notifications] Native salah alarm cancel FAILED: id=$id, $e');
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════
