@@ -32,10 +32,6 @@ class NotificationService {
   static const int _idSalahBase       = 60;
   static const int _idSalahMax        = 400; // Allow up to 341 slots
 
-  // FIX: Track the number of Salah Nabi slots actually scheduled last time.
-  // This avoids cancelling 341 IDs individually when only 24 were scheduled.
-  static int _lastSalahSlotCount = 0;
-
   // ── Channels ──────────────────────────────────────────────────────────────
   static const String _channelPrayer  = 'diyaa_prayer';
   static const String _channelAzkar   = 'diyaa_azkar';
@@ -121,11 +117,14 @@ class NotificationService {
         importance: Importance.defaultImportance,
         playSound: false, enableVibration: false,
       ),
-      // Al-Salah channels — max importance ensures sound plays
+      // Al-Salah channels — Importance.high (level 4) plays sound reliably
+      // without requiring USE_FULL_SCREEN_INTENT permission (which Importance.max
+      // level 5 would need on Android 11+). overrideSilent + audioAttributesUsage
+      // alarm bypasses DND regardless of channel importance level.
       const AndroidNotificationChannel(
         'diyaa_salah_salah_enhanced', 'Al-Salah Ala Al-Nabi (Al-Naqshabandi)',
         description: 'Periodic Al-Salah Ala Al-Nabi sound reminders',
-        importance: Importance.max,
+        importance: Importance.high,
         playSound: true,
         sound: RawResourceAndroidNotificationSound('salah_enhanced'),
         enableVibration: false,
@@ -134,16 +133,31 @@ class NotificationService {
       const AndroidNotificationChannel(
         'diyaa_salah_salah_nabi', 'Al-Salah Ala Al-Nabi (Classic)',
         description: 'Periodic Al-Salah Ala Al-Nabi sound reminders',
-        importance: Importance.max,
+        importance: Importance.high,
         playSound: true,
         sound: RawResourceAndroidNotificationSound('salah_nabi'),
+        enableVibration: false,
+        showBadge: false,
+      ),
+      // FIX: Silent channel for when soundEnabled=false.
+      // On Android 8+ (API 26+), notification channel sound takes precedence
+      // over per-notification playSound/silent flags. A channel configured with
+      // playSound:true + custom sound will ALWAYS play that sound regardless of
+      // what AndroidNotificationDetails.playSound or .silent says.
+      // The only way to truly silence a notification on Android 8+ is to post
+      // it on a channel that has no sound configured.
+      const AndroidNotificationChannel(
+        'diyaa_salah_silent', 'Al-Salah Ala Al-Nabi (Silent)',
+        description: 'Silent Al-Salah Ala Al-Nabi reminders — no sound',
+        importance: Importance.min,
+        playSound: false,
         enableVibration: false,
         showBadge: false,
       ),
     ]) {
       await android.createNotificationChannel(ch);
     }
-    debugPrint('[Notifications] Android channels created.');
+    debugPrint('[Notifications] Android channels created (6 total, incl. silent salah).');
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -370,33 +384,38 @@ class NotificationService {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // AL-SALAH 'ALA AL-NABI  (IDs 60–107)
-  // Sound-only: Importance.min + Visibility.secret keeps the notification
-  // invisible in the shade while still triggering audio on the notification
-  // channel. overrideSilent uses AudioAttributesUsage.alarm to bypass DND.
+  // AL-SALAH 'ALA AL-NABI  (IDs 60–400)
+  // When soundEnabled: Importance.high + Visibility.secret plays sound via
+  // channel config while keeping notification content hidden in the shade.
+  // When !soundEnabled: routed to silent channel (Importance.min, no sound).
+  // overrideSilent uses AudioAttributesUsage.alarm to bypass DND.
   // ══════════════════════════════════════════════════════════════════════════
   static Future<void> scheduleSalahNabiReminders({
     required bool enabled,
     required String soundAsset,
     required int intervalMinutes,
     required bool overrideSilent,
-    required bool soundEnabled, // FIX: Now passed through from AppProvider
+    required bool soundEnabled,
   }) async {
     if (!_isMobile) return;
 
-    // FIX: Optimized cancellation — only cancel IDs that were actually scheduled
-    // last time (tracked via _lastSalahSlotCount), not all 341 possible IDs.
-    // On first run (_lastSalahSlotCount == 0), cancel a safe default range.
-    final cancelUpTo = _lastSalahSlotCount > 0
-        ? _idSalahBase + _lastSalahSlotCount
-        : _idSalahBase + 48; // Safe default: 48 slots = 30-min intervals
-    for (int i = _idSalahBase; i < cancelUpTo; i++) {
+    // FIX: Request permissions before scheduling. Without this, if the user
+    // toggles Salah Nabi on for the first time or permissions were revoked,
+    // zonedSchedule() fails silently on Android 13+ (no POST_NOTIFICATIONS)
+    // and Android 12+ (no SCHEDULE_EXACT_ALARM).
+    await requestPermissions();
+
+    // FIX: Cancel ALL possible Salah Nabi IDs (60–400) every time.
+    // Previously used _lastSalahSlotCount to only cancel previously-scheduled
+    // IDs, but that static variable resets to 0 on process death, leaving
+    // orphaned notifications firing at old times after app restart.
+    // Cancelling 341 IDs is fast (~1ms each) and guarantees no orphans.
+    for (int i = _idSalahBase; i <= _idSalahMax; i++) {
       await _cancelOne(i);
     }
 
     if (!enabled) {
-      _lastSalahSlotCount = 0;
-      debugPrint('[Notifications] Salah Nabi reminders disabled — cancelled.');
+      debugPrint('[Notifications] Salah Nabi reminders disabled — all IDs cancelled.');
       return;
     }
 
@@ -406,23 +425,34 @@ class NotificationService {
     final slotsPerDay = (24 * 60) ~/ interval;
     final totalSlots = slotsPerDay.clamp(0, _idSalahMax - _idSalahBase + 1);
 
-    final soundFileName = '$soundAsset.mp3';
+    // FIX: On Android 8+ (API 26+), notification channel sound takes precedence
+    // over per-notification playSound/silent flags. When soundEnabled=false,
+    // we must use the silent channel ('diyaa_salah_silent') which has no sound
+    // configured at the channel level. When soundEnabled=true, we use the
+    // per-sound channel which has the custom sound configured.
+    final channelId = soundEnabled
+        ? 'diyaa_salah_$soundAsset'
+        : 'diyaa_salah_silent';
+    final channelName = soundEnabled
+        ? 'Al-Salah Ala Al-Nabi'
+        : 'Al-Salah Ala Al-Nabi (Silent)';
 
-    // FIX: Build AndroidNotificationDetails with proper settings:
-    // - Importance.max matches the pre-created channel (was Importance.high — mismatch)
-    // - playSound controlled by soundEnabled (was always true — disconnected from preference)
-    // - timeoutAfter removed (was 7000ms — cut off sound playback prematurely)
-    // - silent flag controlled by soundEnabled (was always false)
+    // Build notification details — channel selection handles sound on Android 8+.
+    // For Android < 8 and iOS, per-notification flags still work.
     final androidDetails = AndroidNotificationDetails(
-      'diyaa_salah_$soundAsset',
-      'Al-Salah Ala Al-Nabi',
-      importance: Importance.max, // FIX: was Importance.high — mismatch with channel
-      priority: Priority.max,
-      visibility: NotificationVisibility.public,
-      playSound: soundEnabled, // FIX: was always true — now respects user preference
+      channelId,
+      channelName,
+      importance: soundEnabled ? Importance.high : Importance.min,
+      priority: soundEnabled ? Priority.max : Priority.min,
+      // FIX: Always use Visibility.secret for Salah Nabi — this is a periodic
+      // sound reminder (every 5-60 min). Visibility.public would fill the shade
+      // with visible notifications. Visibility.secret hides the content while
+      // still allowing the Importance.high channel to play sound.
+      visibility: NotificationVisibility.secret,
+      playSound: soundEnabled,
       sound: soundEnabled
           ? RawResourceAndroidNotificationSound(soundAsset)
-          : null, // FIX: only set custom sound when soundEnabled is true
+          : null,
       audioAttributesUsage: overrideSilent
           ? AudioAttributesUsage.alarm
           : AudioAttributesUsage.notification,
@@ -432,19 +462,34 @@ class NotificationService {
       enableVibration: false,
       showWhen: false,
       ongoing: false,
-      silent: !soundEnabled, // FIX: was always false — now controlled by soundEnabled
+      silent: !soundEnabled,
       icon: '@mipmap/launcher_icon',
-      // FIX: timeoutAfter removed — was cutting off sound playback after 7 seconds.
-      // The notification auto-dismisses naturally; sound file length determines audio duration.
     );
 
+    // FIX: presentAlert is always false for Salah Nabi — this is a periodic
+    // sound-only reminder. Showing a banner every 5-60 minutes is disruptive.
+    // When soundEnabled=true: sound plays, no banner (sound-only reminder).
+    // When soundEnabled=false: no sound, no banner (user disabled reminders).
     final iosDetails = DarwinNotificationDetails(
       presentAlert: false,
       presentBadge: false,
-      presentSound: soundEnabled, // FIX: was always true — now respects user preference
+      presentSound: soundEnabled,
     );
 
     final details = NotificationDetails(android: androidDetails, iOS: iosDetails);
+
+    // FIX: Check exact-alarm permission ONCE before the loop, not per-slot.
+    // canScheduleExactNotifications() is a platform channel call — calling it
+    // 24+ times in a loop is slow and wasteful since the result doesn't change.
+    final android = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    bool canExact = true;
+    if (android != null) {
+      canExact = await android.canScheduleExactNotifications() ?? false;
+    }
+    final scheduleMode = canExact
+        ? AndroidScheduleMode.exactAllowWhileIdle
+        : AndroidScheduleMode.inexactAllowWhileIdle;
 
     // Schedule one slot per interval, starting from the next interval boundary
     final now = DateTime.now();
@@ -466,22 +511,13 @@ class NotificationService {
       final id = _idSalahBase + slot;
 
       try {
-        final android = _plugin.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
-        bool canExact = true;
-        if (android != null) {
-          canExact = await android.canScheduleExactNotifications() ?? false;
-        }
-
         await _plugin.zonedSchedule(
           id: id,
           title: 'اللهم صل على محمد',
-          body: 'صلّوا على النبي ﷺ', // FIX: was ' ' (whitespace) — risk of OS suppression on Android 13+
+          body: 'صلّوا على النبي ﷺ',
           scheduledDate: tzTime,
           notificationDetails: details,
-          androidScheduleMode: canExact
-              ? AndroidScheduleMode.exactAllowWhileIdle
-              : AndroidScheduleMode.inexactAllowWhileIdle,
+          androidScheduleMode: scheduleMode,
           matchDateTimeComponents: DateTimeComponents.time,
         );
         scheduledCount++;
@@ -490,12 +526,9 @@ class NotificationService {
       }
     }
 
-    // FIX: Track the number of slots scheduled for efficient cancellation next time
-    _lastSalahSlotCount = scheduledCount;
-
     debugPrint('[Notifications] Scheduled $scheduledCount salah nabi reminders '
-        '(every $interval min, sound=$soundFileName, overrideSilent=$overrideSilent, '
-        'soundEnabled=$soundEnabled).');
+        '(every $interval min, channel=$channelId, overrideSilent=$overrideSilent, '
+        'soundEnabled=$soundEnabled, canExact=$canExact).');
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -608,12 +641,22 @@ class NotificationService {
         // Ensure permissions are granted before showing the notification
         await requestPermissions();
 
+        // FIX: Use silent channel when soundEnabled=false (same logic as
+        // scheduleSalahNabiReminders — channel sound overrides per-notification
+        // flags on Android 8+). Importance.high avoids USE_FULL_SCREEN_INTENT
+        // permission requirement. Visibility.secret hides content in shade.
+        final testChannelId = soundEnabled
+            ? 'diyaa_salah_$soundAsset'
+            : 'diyaa_salah_silent';
+        final testChannelName = soundEnabled
+            ? 'Al-Salah Ala Al-Nabi'
+            : 'Al-Salah Ala Al-Nabi (Silent)';
         final androidDetails = AndroidNotificationDetails(
-          'diyaa_salah_$soundAsset',
-          'Al-Salah Ala Al-Nabi',
-          importance: Importance.max,
-          priority: Priority.max,
-          visibility: NotificationVisibility.public,
+          testChannelId,
+          testChannelName,
+          importance: soundEnabled ? Importance.high : Importance.min,
+          priority: soundEnabled ? Priority.high : Priority.min,
+          visibility: NotificationVisibility.secret,
           playSound: soundEnabled,
           sound: soundEnabled
               ? RawResourceAndroidNotificationSound(soundAsset)
