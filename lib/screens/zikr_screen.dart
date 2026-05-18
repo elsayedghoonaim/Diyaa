@@ -431,7 +431,7 @@ class _ZikrScreenState extends State<ZikrScreen> {
     });
     _saveProgress();
 
-    // When the count reaches the target, auto-advance after a brief visual pause
+    // When the count reaches the target, advance immediately on next frame
     if (_counts[_zikrIdx] >= total) {
       if (provider.soundEnabled) {
         HapticFeedback.mediumImpact();
@@ -439,7 +439,7 @@ class _ZikrScreenState extends State<ZikrScreen> {
 
       _isAdvancing = true;
 
-      Future.delayed(const Duration(milliseconds: 400), () {
+      Future.microtask(() {
         if (!mounted) return;
         _isAdvancing = false;
 

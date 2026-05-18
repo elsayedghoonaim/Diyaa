@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -16,21 +17,26 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   // ── IDs ───────────────────────────────────────────────────────────────────
-  static const int _idPrayerBase     = 10;
-  static const int _idPostPrayerBase = 20;
+  static const int _idPrayerBase      = 10;
+  static const int _idPostPrayerBase  = 20;
   // ID 21 is reserved for post-Dhuhr (Mon–Thu, Sat–Sun daily)
   // ID 25 is the weekly Jumu'ah post-prayer azkar (Friday only)
-  static const int _idJumuah         = 25;
-  static const int _idMorningAzkar   = 30;
-  static const int _idEveningAzkar   = 31;
-  static const int _idSleepAzkar     = 32;
-  static const int _idNightAzkar     = 33;
-  static const int _idStreakWarning  = 40;
+  static const int _idJumuah          = 25;
+  static const int _idMorningAzkar    = 30;
+  static const int _idEveningAzkar    = 31;
+  static const int _idSleepAzkar      = 32;
+  static const int _idNightAzkar      = 33;
+  static const int _idStreakWarning   = 40;
+
+  // Al-Salah 'ala Al-Nabi IDs — up to 48 slots (every 30 min across 24h)
+  static const int _idSalahBase       = 60;
+  static const int _idSalahMax        = 107;
 
   // ── Channels ──────────────────────────────────────────────────────────────
-  static const String _channelPrayer = 'diyaa_prayer';
-  static const String _channelAzkar  = 'diyaa_azkar';
-  static const String _channelStreak = 'diyaa_streak';
+  static const String _channelPrayer  = 'diyaa_prayer';
+  static const String _channelAzkar   = 'diyaa_azkar';
+  static const String _channelStreak  = 'diyaa_streak';
+  static const String _channelSalah   = 'diyaa_salah';
 
   static bool get _isMobile =>
       !kIsWeb && !Platform.isWindows && !Platform.isLinux;
@@ -112,6 +118,15 @@ class NotificationService {
         importance: Importance.defaultImportance,
         playSound: false, enableVibration: false,
       ),
+      // Al-Salah channel — min importance keeps it invisible in shade
+      const AndroidNotificationChannel(
+        _channelSalah, 'Al-Salah Ala Al-Nabi',
+        description: 'Periodic Al-Salah Ala Al-Nabi sound reminders',
+        importance: Importance.min,
+        playSound: true,
+        enableVibration: false,
+        showBadge: false,
+      ),
     ]) {
       await android.createNotificationChannel(ch);
     }
@@ -129,11 +144,9 @@ class NotificationService {
     if (android != null) {
       final notif = await android.requestNotificationsPermission();
       // On Android 14+, SCHEDULE_EXACT_ALARM is denied by default.
-      // Check before requesting to avoid unnecessary system-settings redirect.
       bool? canExact = await android.canScheduleExactNotifications();
       if (canExact != true) {
         await android.requestExactAlarmsPermission();
-        // Re-check after the user returns from system settings
         canExact = await android.canScheduleExactNotifications();
       }
       debugPrint('[Notifications] Android — notif: $notif, exactAlarms: $canExact');
@@ -148,8 +161,6 @@ class NotificationService {
     }
   }
 
-  /// Whether exact alarms can be scheduled on the current platform.
-  /// Returns false on non-mobile or when Android has revoked the permission.
   static Future<bool> canScheduleExact() async {
     if (!_isMobile) return false;
     final android = _plugin.resolvePlatformSpecificImplementation<
@@ -157,7 +168,7 @@ class NotificationService {
     if (android != null) {
       return await android.canScheduleExactNotifications() ?? false;
     }
-    return true; // iOS always supports scheduled notifications
+    return true;
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -181,9 +192,6 @@ class NotificationService {
     if (notifPrayer) await _schedulePrayerTimes(prayers, isArabic: isArabic);
     if (notifAzkar)  await _scheduleAzkarReminders(prayers, isArabic: isArabic);
 
-    // FIX: _cancelAll() wiped the streak notification — always reschedule it.
-    // Previously this only canceled when notifStreak was false, but never
-    // recreated the notification after the cancelAll() above destroyed it.
     await scheduleStreakWarning(
       enabled: notifStreak,
       isArabic: isArabic,
@@ -192,7 +200,7 @@ class NotificationService {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // PRAYER  (IDs 10–14)
+  // PRAYER  (IDs 10–14) — no emojis
   // ══════════════════════════════════════════════════════════════════════════
   static Future<void> _schedulePrayerTimes(
     PrayerInfo prayers, {required bool isArabic}) async {
@@ -206,8 +214,8 @@ class NotificationService {
     for (final p in list) {
       await _schedule(
         id: p.id, channelId: _channelPrayer, channelName: 'Prayer Times',
-        title: isArabic ? 'حان الآن موعد صلاة ${p.ar} 🕌'
-                        : 'It is time for ${p.en} prayer 🕌',
+        title: isArabic ? 'حان الآن موعد صلاة ${p.ar}'
+                        : 'It is time for ${p.en} prayer',
         body: isArabic
             ? 'أرحنا بها يا بلال. لا تنس أداء الصلاة في وقتها.'
             : "Time to pray. Don't forget to perform your prayer on time.",
@@ -218,8 +226,7 @@ class NotificationService {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // AZKAR  (IDs 20–24, 30–33)
-  // Post-prayer azkar live here so they respect the notifAzkar flag.
+  // AZKAR  (IDs 20–24, 30–33) — no emojis
   // ══════════════════════════════════════════════════════════════════════════
   static Future<void> _scheduleAzkarReminders(
     PrayerInfo prayers, {required bool isArabic}) async {
@@ -236,8 +243,8 @@ class NotificationService {
       await _schedule(
         id: _idPostPrayerBase + i,
         channelId: _channelAzkar, channelName: 'Azkar Reminders',
-        title: isArabic ? 'أذكار ما بعد صلاة ${p.ar} 📿'
-                        : 'Post-${p.en} Azkar 📿',
+        title: isArabic ? 'أذكار ما بعد صلاة ${p.ar}'
+                        : 'Post-${p.en} Azkar',
         body: isArabic
             ? 'تقبل الله صلاتك! لا تنس أذكار ما بعد الصلاة.'
             : 'May Allah accept your prayer! Time for post-prayer supplications.',
@@ -248,7 +255,7 @@ class NotificationService {
     await _schedule(
       id: _idMorningAzkar,
       channelId: _channelAzkar, channelName: 'Azkar Reminders',
-      title: isArabic ? 'أذكار الصباح 🌅' : 'Morning Azkar 🌅',
+      title: isArabic ? 'أذكار الصباح' : 'Morning Azkar',
       body:  isArabic ? 'ابدأ يومك بنور الذكر. حان وقت أذكار الصباح.'
                       : 'Start your day with remembrance. Time for Morning Azkar.',
       scheduledTime: prayers.fajr.add(const Duration(minutes: 30)),
@@ -257,7 +264,7 @@ class NotificationService {
     await _schedule(
       id: _idEveningAzkar,
       channelId: _channelAzkar, channelName: 'Azkar Reminders',
-      title: isArabic ? 'أذكار المساء 🌇' : 'Evening Azkar 🌇',
+      title: isArabic ? 'أذكار المساء' : 'Evening Azkar',
       body:  isArabic ? 'لا تنس أذكار المساء. اجعل ختام يومك ذكراً.'
                       : 'Protect yourself until morning. Time for Evening Azkar.',
       scheduledTime: prayers.asr.add(const Duration(minutes: 30)),
@@ -266,7 +273,7 @@ class NotificationService {
     await _schedule(
       id: _idSleepAzkar,
       channelId: _channelAzkar, channelName: 'Azkar Reminders',
-      title: isArabic ? 'أذكار النوم 🌙' : 'Sleep Azkar 🌙',
+      title: isArabic ? 'أذكار النوم' : 'Sleep Azkar',
       body:  isArabic ? 'اختم يومك بذكر الله لتنام في طمأنينة.'
                       : 'End your day with remembrance of Allah for peaceful sleep.',
       scheduledTime: prayers.isha.add(const Duration(minutes: 30)),
@@ -275,7 +282,7 @@ class NotificationService {
     await _schedule(
       id: _idNightAzkar,
       channelId: _channelAzkar, channelName: 'Azkar Reminders',
-      title: isArabic ? 'قيام الليل 🌌' : 'Night Azkar 🌌',
+      title: isArabic ? 'قيام الليل' : 'Night Azkar',
       body:  isArabic ? 'إن ربك ينزل إلى السماء الدنيا في هذا الوقت، فاذكره وادعه.'
                       : 'The last third of the night is a time of blessing. Make dua.',
       scheduledTime: prayers.fajr.subtract(const Duration(minutes: 30)),
@@ -283,21 +290,15 @@ class NotificationService {
 
     debugPrint('[Notifications] Scheduled 9 azkar notifications.');
 
-    // Jumu'ah (Friday): schedule a separate weekly post-prayer azkar at
-    // dhuhr + 60 min. On Fridays the khutbah takes ~45–60 min, so
-    // the standard +15 min would fire during the prayer itself.
     await _scheduleJumuahAzkar(prayers.dhuhr, isArabic: isArabic);
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // JUMU'AH  (ID 25) — weekly, Friday only
-  // Fires at dhuhr + 60 min every Friday using dayOfWeekAndTime.
+  // JUMU'AH  (ID 25) — no emojis
   // ══════════════════════════════════════════════════════════════════════════
   static Future<void> _scheduleJumuahAzkar(
     DateTime dhuhrTime, {required bool isArabic}) async {
-    // Find the next Friday at dhuhr+60min
     var fireAt = dhuhrTime.add(const Duration(minutes: 60));
-    // DateTime.weekday: Monday=1 … Sunday=7; Friday=5
     final daysUntilFriday = (5 - fireAt.weekday + 7) % 7;
     fireAt = fireAt.add(Duration(days: daysUntilFriday == 0 ? 0 : daysUntilFriday));
     if (fireAt.isBefore(DateTime.now())) {
@@ -311,22 +312,130 @@ class NotificationService {
         id: _idJumuah,
         channelId: _channelAzkar,
         channelName: 'Azkar Reminders',
-        title: isArabic ? 'أذكار ما بعد صلاة الجمعة 📿🕌'
-                        : 'Post-Jumu\'ah Azkar 📿🕌',
+        title: isArabic ? 'أذكار ما بعد صلاة الجمعة'
+                        : "Post-Jumu'ah Azkar",
         body: isArabic
             ? 'تقبل الله صلاتكم. لا تنسوا أذكار ما بعد صلاة الجمعة المباركة.'
-            : 'May Allah accept your Jumu\'ah prayer! Time for post-prayer supplications.',
+            : "May Allah accept your Jumu'ah prayer! Time for post-prayer supplications.",
         tzTime: tzTime,
         matchComponents: DateTimeComponents.dayOfWeekAndTime,
       );
-      debugPrint('[Notifications] Jumu\'ah azkar scheduled for $fireAt (weekly Fri).');
+      debugPrint("[Notifications] Jumu'ah azkar scheduled for $fireAt (weekly Fri).");
     } catch (e) {
       debugPrint('[Notifications] ERROR Jumu\'ah id=$_idJumuah: $e');
     }
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // STREAK WARNING  (ID 40)
+  // AL-SALAH 'ALA AL-NABI  (IDs 60–107)
+  // Sound-only: Importance.min + Visibility.secret keeps the notification
+  // invisible in the shade while still triggering audio on the notification
+  // channel. overrideSilent uses AudioAttributesUsage.alarm to bypass DND.
+  // ══════════════════════════════════════════════════════════════════════════
+  static Future<void> scheduleSalahNabiReminders({
+    required bool enabled,
+    required String soundAsset,
+    required int intervalMinutes,
+    required bool overrideSilent,
+  }) async {
+    if (!_isMobile) return;
+
+    // Cancel all existing salah slots
+    for (int i = _idSalahBase; i <= _idSalahMax; i++) {
+      await _cancelOne(i);
+    }
+
+    if (!enabled) {
+      debugPrint('[Notifications] Salah Nabi reminders disabled — cancelled.');
+      return;
+    }
+
+    // Validate interval (30, 60, 90, 120)
+    final interval = intervalMinutes.clamp(30, 120);
+    // Number of daily slots
+    final slotsPerDay = (24 * 60) ~/ interval;
+    final totalSlots = slotsPerDay.clamp(0, _idSalahMax - _idSalahBase + 1);
+
+    final soundFileName = '$soundAsset.mp3';
+
+    // Build AndroidNotificationDetails for each slot
+    // Importance.min + Visibility.secret = hidden from shade, status bar
+    // AudioAttributesUsage.alarm bypasses silent/DND when overrideSilent=true
+    final androidDetails = AndroidNotificationDetails(
+      _channelSalah,
+      'Al-Salah Ala Al-Nabi',
+      importance: Importance.min,
+      priority: Priority.min,
+      visibility: NotificationVisibility.secret,
+      playSound: true,
+      sound: RawResourceAndroidNotificationSound(soundAsset),
+      audioAttributesUsage: overrideSilent
+          ? AudioAttributesUsage.alarm
+          : AudioAttributesUsage.notification,
+      enableVibration: false,
+      showWhen: false,
+      ongoing: false,
+      silent: false,
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: false,
+      presentBadge: false,
+      presentSound: true,
+    );
+
+    final details = NotificationDetails(android: androidDetails, iOS: iosDetails);
+
+    // Schedule one slot per interval, starting from the next interval boundary
+    final now = DateTime.now();
+    final minutesSinceMidnight = now.hour * 60 + now.minute;
+    final firstSlotMinutes = ((minutesSinceMidnight ~/ interval) + 1) * interval;
+
+    int scheduledCount = 0;
+    for (int slot = 0; slot < totalSlots; slot++) {
+      final slotMinutes = (firstSlotMinutes + slot * interval) % (24 * 60);
+      final hour = slotMinutes ~/ 60;
+      final minute = slotMinutes % 60;
+
+      var fireAt = DateTime(now.year, now.month, now.day, hour, minute);
+      if (fireAt.isBefore(now)) {
+        fireAt = fireAt.add(const Duration(days: 1));
+      }
+
+      final tzTime = tz.TZDateTime.from(fireAt, tz.local);
+      final id = _idSalahBase + slot;
+
+      try {
+        final android = _plugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+        bool canExact = true;
+        if (android != null) {
+          canExact = await android.canScheduleExactNotifications() ?? false;
+        }
+
+        await _plugin.zonedSchedule(
+          id: id,
+          title: 'اللهم صل على محمد',
+          body: '',
+          scheduledDate: tzTime,
+          notificationDetails: details,
+          androidScheduleMode: canExact
+              ? AndroidScheduleMode.exactAllowWhileIdle
+              : AndroidScheduleMode.inexactAllowWhileIdle,
+          matchDateTimeComponents: DateTimeComponents.time,
+        );
+        scheduledCount++;
+      } catch (e) {
+        debugPrint('[Notifications] Salah slot id=$id ERROR: $e');
+      }
+    }
+
+    debugPrint('[Notifications] Scheduled $scheduledCount salah nabi reminders '
+        '(every $interval min, sound=$soundFileName, overrideSilent=$overrideSilent).');
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // STREAK WARNING  (ID 40) — no emojis
   // ══════════════════════════════════════════════════════════════════════════
   static Future<void> scheduleStreakWarning({
     required bool enabled,
@@ -344,8 +453,8 @@ class NotificationService {
     await _schedule(
       id: _idStreakWarning,
       channelId: _channelStreak, channelName: 'Streak & Milestones',
-      title: isArabic ? 'لا تكسر سلسلتك 🔥 ($currentStreak يوم)'
-                      : "Don't break your streak! 🔥 ($currentStreak days)",
+      title: isArabic ? 'لا تكسر سلسلتك ($currentStreak يوم)'
+                      : "Don't break your streak! ($currentStreak days)",
       body:  isArabic ? 'لا تزال أذكار اليوم في انتظارك. حافظ على سلسلتك!'
                       : 'Your daily Azkar are waiting. Keep your streak alive!',
       scheduledTime: fireAt,
@@ -354,17 +463,30 @@ class NotificationService {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // TEST NOTIFICATION — fires immediately to verify the pipeline works.
-  // Call from settings or on startup for debugging.
+  // PREVIEW SOUND
+  // ══════════════════════════════════════════════════════════════════════════
+  static final AudioPlayer _previewPlayer = AudioPlayer();
+
+  static Future<void> previewSalahSound(String soundAsset) async {
+    try {
+      await _previewPlayer.stop();
+      await _previewPlayer.play(AssetSource('sounds/$soundAsset.mp3'));
+    } catch (e) {
+      debugPrint('[Notifications] Preview failed: $e');
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // TEST NOTIFICATION — no emojis
   // ══════════════════════════════════════════════════════════════════════════
   static Future<void> sendTestNotification({bool isArabic = false}) async {
     try {
-      debugPrint('[Notifications] Sending test notification…');
+      debugPrint('[Notifications] Sending test notification...');
       await _plugin.show(
         id: 99,
-        title: isArabic ? 'اختبار إشعارات ضياء ✅' : 'Diyaa Notifications Test ✅',
+        title: isArabic ? 'اختبار اشعارات ضياء' : 'Diyaa Notifications Test',
         body: isArabic
-            ? 'الإشعارات تعمل بشكل صحيح!'
+            ? 'الاشعارات تعمل بشكل صحيح!'
             : 'If you see this, notifications are working!',
         notificationDetails: const NotificationDetails(
           android: AndroidNotificationDetails(
@@ -405,7 +527,7 @@ class NotificationService {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // CANCEL  — delegates to scheduler (no positional args on Windows)
+  // CANCEL
   // ══════════════════════════════════════════════════════════════════════════
   static Future<void> _cancelAll() async =>
       scheduler.cancelAllNotifications(_plugin);
@@ -414,12 +536,12 @@ class NotificationService {
       scheduler.cancelNotification(_plugin, id);
 
   static Future<void> cancelPrayerNotifications() async {
-    for (int i = 0; i < 5; i++) await _cancelOne(_idPrayerBase + i);
+    for (int i = 0; i < 5; i++) { await _cancelOne(_idPrayerBase + i); }
   }
 
   static Future<void> cancelAzkarNotifications() async {
-    for (int i = 0; i < 5; i++) await _cancelOne(_idPostPrayerBase + i);
-    await _cancelOne(_idJumuah);        // cancel Friday Jumu'ah azkar too
+    for (int i = 0; i < 5; i++) { await _cancelOne(_idPostPrayerBase + i); }
+    await _cancelOne(_idJumuah);
     await _cancelOne(_idMorningAzkar);
     await _cancelOne(_idEveningAzkar);
     await _cancelOne(_idSleepAzkar);

@@ -24,6 +24,7 @@ dependencies:
   share_plus: ^10.0.0
   path_provider: ^2.1.0
   flutter_timezone: ^5.0.2
+  audioplayers: ^5.2.1
 
 dev_dependencies:
   flutter_test:
@@ -38,6 +39,7 @@ flutter:
     - assets/adhkar_source.json
     - assets/azkar.txt
     - assets/icon.png
+    - assets/sounds/
 
 flutter_launcher_icons:
   android: "launcher_icon"

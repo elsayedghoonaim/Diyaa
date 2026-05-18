@@ -25,11 +25,17 @@ const String _kSessionProgressIndexKey  = 'diyaa-session-progress-index';
 const String _kSessionProgressCountsKey = 'diyaa-session-progress-counts';
 
 // Notification keys
-const String _kNotifPrayerKey   = 'diyaa-notif-prayer';
-const String _kNotifAzkarKey    = 'diyaa-notif-azkar';   // FIX: was missing entirely
-const String _kNotifStreakKey   = 'diyaa-notif-streak';
-const String _kNotifMilestoneKey = 'diyaa-notif-milestone';
-const String _kSoundEnabledKey  = 'diyaa-sound-enabled';
+const String _kNotifPrayerKey        = 'diyaa-notif-prayer';
+const String _kNotifAzkarKey         = 'diyaa-notif-azkar';   // FIX: was missing entirely
+const String _kNotifStreakKey        = 'diyaa-notif-streak';
+const String _kNotifMilestoneKey     = 'diyaa-notif-milestone';
+const String _kSoundEnabledKey       = 'diyaa-sound-enabled';
+
+// Al-Salah 'ala Al-Nabi notification keys
+const String _kSalahNotifKey         = 'diyaa-salah-notif';
+const String _kSalahSoundKey         = 'diyaa-salah-sound';        // 'salah_enhanced' | 'salah_nabi'
+const String _kSalahIntervalKey      = 'diyaa-salah-interval';     // minutes: 30/60/90/120
+const String _kSalahOverrideSilentKey = 'diyaa-salah-override-silent';
 
 // Location prefs version — bump to force a reset when location logic changes.
 // v1 = original (no GPS toggle)
@@ -79,11 +85,17 @@ class AppProvider extends ChangeNotifier {
   // FIX: _notifAzkar now exists as a fully independent preference.
   // Previously notifAzkar was always passed as _notifPrayer, meaning toggling
   // prayer notifications silently toggled azkar too, with no user-visible control.
-  bool _notifPrayer   = true;
-  bool _notifAzkar    = true;   // ← NEW independent flag
-  bool _notifStreak   = true;
+  bool _notifPrayer    = true;
+  bool _notifAzkar     = true;
+  bool _notifStreak    = true;
   bool _notifMilestone = true;
-  bool _soundEnabled  = true;
+  bool _soundEnabled   = true;
+
+  // Al-Salah 'ala Al-Nabi
+  bool   _salahNotif         = false;
+  String _salahSound         = 'salah_enhanced';
+  int    _salahInterval      = 60;
+  bool   _salahOverrideSilent = false;
 
   // ── Onboarding ────────────────────────────────────────────────────────────
   bool _onboardingComplete = false;
@@ -122,11 +134,17 @@ class AppProvider extends ChangeNotifier {
   bool   get useLocation        => _useGps; // compat alias
   String get manualCityName     => _manualCityName;
 
-  bool   get notifPrayer        => _notifPrayer;
-  bool   get notifAzkar         => _notifAzkar;   // ← NEW getter
-  bool   get notifStreak        => _notifStreak;
-  bool   get notifMilestone     => _notifMilestone;
-  bool   get soundEnabled       => _soundEnabled;
+  bool   get notifPrayer         => _notifPrayer;
+  bool   get notifAzkar          => _notifAzkar;
+  bool   get notifStreak         => _notifStreak;
+  bool   get notifMilestone      => _notifMilestone;
+  bool   get soundEnabled        => _soundEnabled;
+
+  // Al-Salah 'ala Al-Nabi getters
+  bool   get salahNotif          => _salahNotif;
+  String get salahSound          => _salahSound;
+  int    get salahInterval       => _salahInterval;
+  bool   get salahOverrideSilent => _salahOverrideSilent;
   bool   get onboardingComplete => _onboardingComplete;
 
   Set<String>      get completedSessionsToday => _completedSessionsToday;
@@ -249,11 +267,17 @@ class AppProvider extends ChangeNotifier {
     _onboardingComplete = prefs.getBool(_kOnboardingCompleteKey) ?? false;
 
     // ── Notification prefs ──
-    _notifPrayer   = prefs.getBool(_kNotifPrayerKey)    ?? true;
-    _notifAzkar    = prefs.getBool(_kNotifAzkarKey)     ?? true;   // FIX: load independently
-    _notifStreak   = prefs.getBool(_kNotifStreakKey)    ?? true;
-    _notifMilestone = prefs.getBool(_kNotifMilestoneKey) ?? true;
-    _soundEnabled  = prefs.getBool(_kSoundEnabledKey)   ?? true;
+    _notifPrayer    = prefs.getBool(_kNotifPrayerKey)     ?? true;
+    _notifAzkar     = prefs.getBool(_kNotifAzkarKey)      ?? true;
+    _notifStreak    = prefs.getBool(_kNotifStreakKey)      ?? true;
+    _notifMilestone = prefs.getBool(_kNotifMilestoneKey)  ?? true;
+    _soundEnabled   = prefs.getBool(_kSoundEnabledKey)    ?? true;
+
+    // ── Al-Salah 'ala Al-Nabi prefs ──
+    _salahNotif          = prefs.getBool(_kSalahNotifKey)           ?? false;
+    _salahSound          = prefs.getString(_kSalahSoundKey)         ?? 'salah_enhanced';
+    _salahInterval       = prefs.getInt(_kSalahIntervalKey)         ?? 60;
+    _salahOverrideSilent = prefs.getBool(_kSalahOverrideSilentKey)  ?? false;
 
     // ── Progress ──
     _totalPoints   = prefs.getInt(_kTotalPointsKey)   ?? 0;
@@ -428,6 +452,8 @@ class AppProvider extends ChangeNotifier {
         notifStreak: _notifStreak,
         currentStreak: _streak,
       );
+      // Also reschedule Al-Salah 'ala Al-Nabi reminders
+      await _rescheduleSalahNabi();
     } catch (e) {
       debugPrint('[AppProvider] _rescheduleNotifications failed: $e');
     }
@@ -624,6 +650,53 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kSoundEnabledKey, value);
+  }
+
+  // ── Al-Salah 'ala Al-Nabi setters ────────────────────────────────────────
+
+  Future<void> setSalahNotif(bool value) async {
+    _salahNotif = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kSalahNotifKey, value);
+    await _rescheduleSalahNabi();
+  }
+
+  Future<void> setSalahSound(String value) async {
+    _salahSound = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kSalahSoundKey, value);
+    if (_salahNotif) await _rescheduleSalahNabi();
+  }
+
+  Future<void> setSalahInterval(int minutes) async {
+    _salahInterval = minutes;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_kSalahIntervalKey, minutes);
+    if (_salahNotif) await _rescheduleSalahNabi();
+  }
+
+  Future<void> setSalahOverrideSilent(bool value) async {
+    _salahOverrideSilent = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kSalahOverrideSilentKey, value);
+    if (_salahNotif) await _rescheduleSalahNabi();
+  }
+
+  Future<void> _rescheduleSalahNabi() async {
+    try {
+      await NotificationService.scheduleSalahNabiReminders(
+        enabled:       _salahNotif,
+        soundAsset:    _salahSound,
+        intervalMinutes: _salahInterval,
+        overrideSilent: _salahOverrideSilent,
+      );
+    } catch (e) {
+      debugPrint('[AppProvider] _rescheduleSalahNabi failed: $e');
+    }
   }
 
   Future<void> completeOnboarding() async {
