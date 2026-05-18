@@ -9,6 +9,7 @@ import '../widgets/settings/section_widget.dart';
 import '../widgets/settings/setting_row.dart';
 import '../widgets/settings/city_sheet.dart';
 import '../widgets/settings/privacy_sheet.dart';
+import '../widgets/settings/sound_sheet.dart';
 import '../services/notification_service.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -162,6 +163,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   onToggle: () => provider.setUseGps(!provider.useGps),
                                   teal: teal,
                                 ),
+                                isLast: provider.useGps,
                               ),
 
                               if (!provider.useGps)
@@ -184,6 +186,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     backgroundColor: Colors.transparent,
                                     builder: (_) => const CitySheet(),
                                   ),
+                                  isLast: true,
                                 ),
 
                               if (provider.prayerInfo != null)
@@ -211,18 +214,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   ),
                                 ),
 
-                              SettingRow(
-                                icon: Icons.auto_awesome,
-                                iconColor: gold,
-                                iconBgMode: 'gold',
-                                label: 'Calculation Method',
-                                arLabel: 'طريقة الحساب',
-                                sublabel: provider.prayerInfo?.methodName.isNotEmpty == true
-                                    ? '${t('Auto', 'تلقائي')}: ${provider.prayerInfo!.methodName}'
-                                    : t('Auto-detected by location', 'تلقائي حسب الموقع'),
-                                rightWidget: Icon(Icons.gps_fixed, size: 14, color: teal),
-                                isLast: true,
-                              ),
                             ],
                           ),
 
@@ -420,60 +411,29 @@ class _SalahNabiSection extends StatelessWidget {
 
         // Sub-options — only shown when enabled
         if (on) ...[
-          // Sound picker
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 0, 18, 0),
-            child: _SubCard(
-              dark: dark,
-              gold: gold,
-              teal: teal,
-              textSecondary: textSecondary,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    t('Sound', 'الصوت'),
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: textSecondary,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Column(
-                    children: [
-                      _SoundListTile(
-                        label: t('Sound 1', 'صوت ١'),
-                        sublabel: t('Al-Naqshabandi', 'النقشبندي'),
-                        assetId: 'salah_enhanced',
-                        selected: provider.salahSound == 'salah_enhanced',
-                        dark: dark,
-                        teal: teal,
-                        gold: gold,
-                        textSecondary: textSecondary,
-                        onTap: () => provider.setSalahSound('salah_enhanced'),
-                      ),
-                      const SizedBox(height: 6),
-                      _SoundListTile(
-                        label: t('Sound 2', 'صوت ٢'),
-                        sublabel: t('Classic', 'كلاسيكي'),
-                        assetId: 'salah_nabi',
-                        selected: provider.salahSound == 'salah_nabi',
-                        dark: dark,
-                        teal: teal,
-                        gold: gold,
-                        textSecondary: textSecondary,
-                        onTap: () => provider.setSalahSound('salah_nabi'),
-                      ),
-                    ],
-                  ),
-                ],
+          // Sound picker — opens bottom sheet
+          Builder(builder: (ctx) {
+            final selected = kSalahSounds.firstWhere(
+              (s) => s.id == provider.salahSound,
+              orElse: () => kSalahSounds.first,
+            );
+            return SettingRow(
+              icon: Icons.music_note_outlined,
+              iconColor: gold,
+              iconBgMode: 'gold',
+              label: 'Reminder Sound',
+              arLabel: 'صوت التذكير',
+              sublabel: arabic ? selected.nameAr : selected.nameEn,
+              rightWidget: Icon(arabic ? Icons.chevron_left : Icons.chevron_right, size: 16, color: textSecondary),
+              onTap: () => showModalBottomSheet(
+                context: ctx,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => const SoundSheet(),
               ),
-            ),
-          ),
-
-          const SizedBox(height: 2),
+              isLast: false,
+            );
+          }),
 
           // Interval picker
           Padding(
@@ -591,101 +551,6 @@ class _SubCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-// Sound selection list tile
-// ─────────────────────────────────────────────
-class _SoundListTile extends StatelessWidget {
-  final String label, sublabel, assetId;
-  final bool selected, dark;
-  final Color teal, gold, textSecondary;
-  final VoidCallback onTap;
-
-  const _SoundListTile({
-    required this.label,
-    required this.sublabel,
-    required this.assetId,
-    required this.selected,
-    required this.dark,
-    required this.teal,
-    required this.gold,
-    required this.textSecondary,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-        decoration: BoxDecoration(
-          color: selected
-              ? (dark ? gold.withOpacity(0.15) : gold.withOpacity(0.10))
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected ? gold : (dark ? const Color(0x33FFFFFF) : const Color(0x22000000)),
-            width: selected ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-              size: 16,
-              color: selected ? gold : (dark ? const Color(0x66FFFFFF) : const Color(0x66000000)),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: selected ? gold : (dark ? const Color(0xAAFFFFFF) : const Color(0xAA000000)),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    sublabel,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: selected ? gold.withOpacity(0.7) : (dark ? const Color(0x55FFFFFF) : const Color(0x55000000)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Play Button
-            GestureDetector(
-              onTap: () {
-                if (!selected) onTap();
-                NotificationService.previewSalahSound(assetId);
-              },
-              child: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: selected ? gold.withOpacity(0.2) : (dark ? const Color(0x22FFFFFF) : const Color(0x11000000)),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.play_arrow_rounded,
-                  size: 20,
-                  color: selected ? gold : textSecondary,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────
 // Interval custom picker row
 // ─────────────────────────────────────────────
 class _IntervalRow extends StatelessWidget {
@@ -706,7 +571,7 @@ class _IntervalRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final min = provider.salahInterval;
     final label = min < 60
-        ? t('${min} min', '${provider.toArabicDigits(min.toString())} دقيقة')
+        ? t('$min min', '${provider.toArabicDigits(min.toString())} دقيقة')
         : t('${min ~/ 60}h ${min % 60 != 0 ? '${min % 60}m' : ''}', 
             '${provider.toArabicDigits((min ~/ 60).toString())} ساعة ${min % 60 != 0 ? '${provider.toArabicDigits((min % 60).toString())} دقيقة' : ''}');
 
