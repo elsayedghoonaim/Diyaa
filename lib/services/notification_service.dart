@@ -368,14 +368,15 @@ class NotificationService {
     final soundFileName = '$soundAsset.mp3';
 
     // Build AndroidNotificationDetails for each slot
-    // Importance.max ensures the OS permits the sound to play
-    // AudioAttributesUsage.alarm bypasses silent/DND when overrideSilent=true
+    // Importance.defaultImportance allows sound to play without dropping a heads-up banner
+    // timeoutAfter ensures the notification cleans itself up from the shade after 15 seconds
+    // We append v3 and the overrideSilent flag to the channel ID to bypass Android's channel caching
     final androidDetails = AndroidNotificationDetails(
-      'diyaa_salah_$soundAsset',
+      'diyaa_salah_v3_${soundAsset}_${overrideSilent ? "alarm" : "notif"}',
       'Al-Salah Ala Al-Nabi',
-      importance: Importance.max,
-      priority: Priority.max,
-      visibility: NotificationVisibility.secret,
+      importance: Importance.defaultImportance,
+      priority: Priority.defaultPriority,
+      visibility: NotificationVisibility.public,
       playSound: true,
       sound: RawResourceAndroidNotificationSound(soundAsset),
       audioAttributesUsage: overrideSilent
@@ -385,6 +386,8 @@ class NotificationService {
       showWhen: false,
       ongoing: false,
       silent: false,
+      icon: '@mipmap/launcher_icon',
+      timeoutAfter: 15000, // Disappears after 15 seconds
     );
 
     const iosDetails = DarwinNotificationDetails(
@@ -425,7 +428,7 @@ class NotificationService {
         await _plugin.zonedSchedule(
           id: id,
           title: 'اللهم صل على محمد',
-          body: '',
+          body: ' ', // Single space instead of empty string to prevent OS suppression
           scheduledDate: tzTime,
           notificationDetails: details,
           androidScheduleMode: canExact

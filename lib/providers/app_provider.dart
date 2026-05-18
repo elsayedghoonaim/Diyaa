@@ -650,6 +650,7 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kSoundEnabledKey, value);
+    await _rescheduleSalahNabi();
   }
 
   // ── Al-Salah 'ala Al-Nabi setters ────────────────────────────────────────
@@ -689,7 +690,7 @@ class AppProvider extends ChangeNotifier {
   Future<void> _rescheduleSalahNabi() async {
     try {
       await NotificationService.scheduleSalahNabiReminders(
-        enabled:       _salahNotif,
+        enabled:       _salahNotif && _soundEnabled,
         soundAsset:    _salahSound,
         intervalMinutes: _salahInterval,
         overrideSilent: _salahOverrideSilent,
