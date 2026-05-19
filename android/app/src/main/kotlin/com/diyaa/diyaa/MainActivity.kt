@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Build
+import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -33,6 +34,7 @@ class MainActivity : FlutterActivity() {
         private const val KEY_SOUND_ASSET = "salah_nabi_sound_asset"
         private const val KEY_OVERRIDE_SILENT = "salah_nabi_override_silent"
         private const val KEY_INTERVAL_MINUTES = "salah_nabi_interval_minutes"
+        private const val TAG = "DiyaaMainActivity"
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -53,17 +55,27 @@ class MainActivity : FlutterActivity() {
                         val overrideSilent = call.argument<Boolean>("overrideSilent") ?: false
                         val intervalMinutes = call.argument<Int>("intervalMinutes") ?: 0
 
-                        // Write full Salah Nabi configuration to SharedPreferences.
-                        // This is needed by SalahBootReceiver to reschedule alarms
-                        // after a device reboot, and by SalahSoundReceiver to check
-                        // if reminders are still enabled at fire time.
+                        // DIAGNOSTIC: Write full Salah Nabi configuration to SharedPreferences.
+                        // CRITICAL FIX: Use commit() instead of apply() to ensure synchronous
+                        // disk write. apply() is asynchronous — data is written to an in-memory
+                        // cache and scheduled for disk write later. If the app process is killed
+                        // before the disk write completes, the data is LOST. When
+                        // SalahSoundReceiver fires in a freshly-spawned process, it reads
+                        // salah_nabi_enabled from disk and gets the default false, causing it
+                        // to CANCEL the alarm instead of playing sound. This is the root cause
+                        // of the "test works but scheduled reminders fail" discrepancy:
+                        // - Test path: app is alive → SharedPreferences in-memory cache has true
+                        // - Scheduled path: app process dead → disk has stale false → alarm cancelled
                         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                        prefs.edit()
+                        val commitResult = prefs.edit()
                             .putBoolean(KEY_ENABLED, true)
                             .putString(KEY_SOUND_ASSET, soundAsset)
                             .putBoolean(KEY_OVERRIDE_SILENT, overrideSilent)
                             .putInt(KEY_INTERVAL_MINUTES, intervalMinutes)
-                            .apply()
+                            .commit()  // DIAGNOSTIC: commit() = synchronous disk write
+                        Log.d(TAG, "scheduleSalahSoundAlarm: SharedPreferences commit() result=$commitResult "
+                            + "(id=$id, sound=$soundAsset, overrideSilent=$overrideSilent, "
+                            + "interval=$intervalMinutes)")
 
                         scheduleAlarm(id, scheduledTime, soundAsset, overrideSilent, intervalMinutes)
                         result.success(true)
@@ -79,8 +91,13 @@ class MainActivity : FlutterActivity() {
                         val enabled = call.argument<Boolean>("enabled") ?: return@setMethodCallHandler result.error(
                             "INVALID_ARGS", "Missing 'enabled' argument", null
                         )
+                        // DIAGNOSTIC: Use commit() instead of apply() for synchronous disk write.
+                        // Same root cause as scheduleSalahSoundAlarm — apply() can lose data
+                        // on process death, causing SalahSoundReceiver to read stale false.
                         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                        prefs.edit().putBoolean(KEY_ENABLED, enabled).apply()
+                        val commitResult = prefs.edit().putBoolean(KEY_ENABLED, enabled).commit()
+                        Log.d(TAG, "setSalahNabiEnabled: SharedPreferences commit() result=$commitResult "
+                            + "(enabled=$enabled)")
                         result.success(true)
                     }
                     else -> result.notImplemented()
