@@ -106,8 +106,9 @@ class SalahSoundReceiver : BroadcastReceiver() {
         // Play the sound via MediaPlayer
         val mediaPlayer = MediaPlayer()
         mediaPlayer.setWakeMode(context, PowerManager.PARTIAL_WAKE_LOCK) // Ensure CPU stays awake during preparation & playback
+        mediaPlayer.setVolume(1.0f, 1.0f) // Set max player volume relative to the stream volume
 
-        // If overrideSilent is enabled and Alarm volume is 0 or muted, temporarily raise it and restore afterwards
+        // If overrideSilent is enabled, ensure the alarm volume is unmuted and sufficiently high, restoring it afterwards.
         var originalAlarmVolume = -1
         if (overrideSilent) {
             try {
@@ -116,11 +117,11 @@ class SalahSoundReceiver : BroadcastReceiver() {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     audioManager.adjustStreamVolume(AudioManager.STREAM_ALARM, AudioManager.ADJUST_UNMUTE, 0)
                 }
-                if (originalAlarmVolume == 0) {
-                    val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
-                    val targetVol = (maxVol * 0.6).toInt().coerceAtLeast(1)
+                val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+                val targetVol = (maxVol * 0.6).toInt().coerceAtLeast(1)
+                if (originalAlarmVolume < targetVol) {
                     audioManager.setStreamVolume(AudioManager.STREAM_ALARM, targetVol, 0)
-                    Log.d(TAG, "overrideSilent=true and STREAM_ALARM volume is 0. Temporarily set to $targetVol (max: $maxVol)")
+                    Log.d(TAG, "overrideSilent=true. STREAM_ALARM volume ($originalAlarmVolume) is below target ($targetVol). Temporarily raised to $targetVol (max: $maxVol)")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to temporarily adjust STREAM_ALARM volume: ${e.message}")
@@ -150,7 +151,6 @@ class SalahSoundReceiver : BroadcastReceiver() {
                 Log.d(TAG, "Resource found: $soundAsset → resourceId=$resourceId")
                 val afd = context.resources.openRawResourceFd(resourceId)
                 mediaPlayer.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-                afd.close()
 
                 mediaPlayer.setOnCompletionListener { mp ->
                     Log.d(TAG, "MediaPlayer completed for id=$alarmId")
@@ -179,6 +179,7 @@ class SalahSoundReceiver : BroadcastReceiver() {
                 Log.d(TAG, "MediaPlayer prepared, starting playback for id=$alarmId")
                 mediaPlayer.start()
                 Log.d(TAG, "MediaPlayer.start() called successfully for id=$alarmId")
+                afd.close()
             } else {
                 Log.e(TAG, "Resource NOT found: $soundAsset → resourceId=0")
                 // Resource not found — still reschedule

@@ -656,7 +656,7 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kSoundEnabledKey, value);
-    await _rescheduleSalahNabi();
+    _rescheduleSalahNabi();
   }
 
   // ── Al-Salah 'ala Al-Nabi setters ────────────────────────────────────────
@@ -666,7 +666,7 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kSalahNotifKey, value);
-    await _rescheduleSalahNabi();
+    _rescheduleSalahNabi();
   }
 
   Future<void> setSalahSound(String value) async {
@@ -674,7 +674,7 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kSalahSoundKey, value);
-    if (_salahNotif) await _rescheduleSalahNabi();
+    if (_salahNotif) _rescheduleSalahNabi();
   }
 
   Future<void> setSalahInterval(int minutes) async {
@@ -682,7 +682,7 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_kSalahIntervalKey, minutes);
-    if (_salahNotif) await _rescheduleSalahNabi();
+    if (_salahNotif) _rescheduleSalahNabi();
   }
 
   Future<void> setSalahOverrideSilent(bool value) async {
@@ -690,7 +690,7 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kSalahOverrideSilentKey, value);
-    if (_salahNotif) await _rescheduleSalahNabi();
+    if (_salahNotif) _rescheduleSalahNabi();
   }
 
   Future<void> _rescheduleSalahNabi() async {

@@ -83,8 +83,7 @@ class NotificationService {
 
     if (_isMobile) await _createAndroidChannels();
 
-    // Preload sound assets for instant previewing
-    await preloadSounds();
+    // Low-latency players do not require boot-time preloading
 
     debugPrint('[Notifications] Initialized (ok=$ok). Mobile: $_isMobile');
   }
@@ -465,28 +464,57 @@ class NotificationService {
     // and Android 12+ (no SCHEDULE_EXACT_ALARM).
     await requestPermissions();
 
-    // FIX: Write enabled state to native SharedPreferences FIRST, before any
-    // cancellation or scheduling. This ensures SalahSoundReceiver knows the
-    // current state even if the app is killed during the 341-ID cancellation
-    // loop. Without this ordering, remaining native alarms would keep firing
-    // and auto-rescheduling because SharedPreferences still had enabled=true.
     if (Platform.isAndroid) {
+      // ── Android: Single Native AlarmManager alarm architecture ──
+      // This solves the UI lag completely by making exactly 2-3 native calls.
       await setSalahNabiEnabledNative(enabled);
+
+      // Cancel the single native alarm and any leftovers
+      await _cancelOne(_idSalahBase);
+      await cancelNativeSalahAlarm(_idSalahBase);
+
+      if (!enabled) {
+        debugPrint('[Notifications] Salah Nabi reminders disabled — Android single alarm cancelled.');
+        return;
+      }
+
+      if (soundEnabled) {
+        final interval = intervalMinutes.clamp(1, 1440);
+        final now = DateTime.now();
+        final minutesSinceMidnight = now.hour * 60 + now.minute;
+        final firstSlotMinutes = ((minutesSinceMidnight ~/ interval) + 1) * interval;
+
+        final hour = firstSlotMinutes ~/ 60;
+        final minute = firstSlotMinutes % 60;
+
+        var fireAt = DateTime(now.year, now.month, now.day, hour, minute);
+        if (fireAt.isBefore(now)) {
+          fireAt = fireAt.add(const Duration(days: 1));
+        }
+
+        try {
+          await scheduleNativeSalahAlarm(
+            id: _idSalahBase,
+            scheduledTime: fireAt,
+            soundAsset: soundAsset,
+            overrideSilent: overrideSilent,
+            intervalMinutes: interval,
+          );
+          debugPrint('[Notifications] Scheduled single Android Salah alarm (id=$_idSalahBase) at $fireAt');
+        } catch (e) {
+          debugPrint('[Notifications] Single Android Salah alarm failed: $e');
+        }
+      }
+      return;
     }
 
-    // FIX: Cancel ALL possible Salah Nabi IDs (60–400) every time.
-    // Previously used _lastSalahSlotCount to only cancel previously-scheduled
-    // IDs, but that static variable resets to 0 on process death, leaving
-    // orphaned notifications firing at old times after app restart.
-    // Cancelling 341 IDs is fast (~1ms each) and guarantees no orphans.
-    // FIX (A7): Also cancel native sound alarms for each Salah Nabi ID.
+    // ── iOS: Standard zonedSchedule loop (max 64 slots) ──
     for (int i = _idSalahBase; i <= _idSalahMax; i++) {
       await _cancelOne(i);
-      await cancelNativeSalahAlarm(i);
     }
 
     if (!enabled) {
-      debugPrint('[Notifications] Salah Nabi reminders disabled — all IDs cancelled, native prefs updated.');
+      debugPrint('[Notifications] Salah Nabi reminders disabled — iOS IDs cancelled.');
       return;
     }
 
@@ -496,12 +524,6 @@ class NotificationService {
     final slotsPerDay = (24 * 60) ~/ interval;
     final totalSlots = slotsPerDay.clamp(0, _idSalahMax - _idSalahBase + 1);
 
-    // FIX (A3): On Android 8+ (API 26+), notification channel sound takes precedence
-    // over per-notification playSound/silent flags. When soundEnabled=false,
-    // we must use the silent channel ('diyaa_salah_silent') which has no sound
-    // configured at the channel level. When soundEnabled=true, we use the
-    // per-sound channel. When overrideSilent=true, we use the alarm-level
-    // channel which has audioAttributesUsage:alarm to bypass DND/silent mode.
     final channelId = soundEnabled
         ? (overrideSilent ? 'diyaa_salah_${soundAsset}_alarm' : 'diyaa_salah_$soundAsset')
         : 'diyaa_salah_silent';
@@ -511,32 +533,13 @@ class NotificationService {
             : 'Al-Salah Ala Al-Nabi')
         : 'Al-Salah Ala Al-Nabi (Silent)';
 
-    // Build notification details — channel selection handles sound on Android 8+.
-    // For Android < 8 and iOS, per-notification flags still work.
-    // FIX (A3): channelAction.update forces the plugin to update the channel
-    // at fire time, ensuring the correct sound configuration is used.
-    // Priority.high (not Priority.max) for consistency with test path and
-    // to avoid USE_FULL_SCREEN_INTENT permission requirement on Android 11+.
     final androidDetails = AndroidNotificationDetails(
       channelId,
       channelName,
       importance: soundEnabled ? Importance.high : Importance.min,
       priority: soundEnabled ? Priority.high : Priority.min,
       channelAction: AndroidNotificationChannelAction.update,
-      // FIX: Use Visibility.private for Salah Nabi — this shows the notification
-      // on the lockscreen but hides sensitive content details. This allows the
-      // high-importance channel to play sound reliably even when the device is locked,
-      // while maintaining privacy. Using Visibility.secret would completely suppress the
-      // notification and sound on secure lockscreens.
       visibility: NotificationVisibility.private,
-      // FIX: Enable notification channel sound for scheduled Salah on Android.
-      // The notification channel sound is the standard, reliable Android mechanism
-      // for playing sounds at scheduled times — it's handled by the system itself,
-      // not by the app's process. This matches the test path configuration exactly.
-      // The native MediaPlayer (via SalahSoundReceiver) provides backup for cases
-      // where the notification channel sound is suppressed (e.g., DND mode).
-      // Brief sound overlap between channel sound and MediaPlayer is acceptable —
-      // the user hears the sound reliably, which is the goal.
       playSound: soundEnabled,
       sound: soundEnabled
           ? RawResourceAndroidNotificationSound(soundAsset)
@@ -554,10 +557,6 @@ class NotificationService {
       icon: '@mipmap/launcher_icon',
     );
 
-    // FIX: presentAlert is always false for Salah Nabi — this is a periodic
-    // sound-only reminder. Showing a banner every 5-60 minutes is disruptive.
-    // When soundEnabled=true: sound plays, no banner (sound-only reminder).
-    // When soundEnabled=false: no sound, no banner (user disabled reminders).
     final iosDetails = DarwinNotificationDetails(
       presentAlert: false,
       presentBadge: false,
@@ -566,17 +565,11 @@ class NotificationService {
 
     final details = NotificationDetails(android: androidDetails, iOS: iosDetails);
 
-    // androidScheduleMode is used by zonedSchedule() on both Android and iOS.
-    // On Android, exactAllowWhileIdle ensures the notification fires at the
-    // exact scheduled time even when the device is in Doze/idle mode.
-    // Fall back to inexact schedule mode if exact alarms permission is not granted,
-    // avoiding security exceptions.
     final canExact = await canScheduleExact();
     final scheduleMode = canExact
         ? AndroidScheduleMode.exactAllowWhileIdle
         : AndroidScheduleMode.inexactAllowWhileIdle;
 
-    // Schedule one slot per interval, starting from the next interval boundary
     final now = DateTime.now();
     final minutesSinceMidnight = now.hour * 60 + now.minute;
     final firstSlotMinutes = ((minutesSinceMidnight ~/ interval) + 1) * interval;
@@ -593,53 +586,24 @@ class NotificationService {
       }
 
       final id = _idSalahBase + slot;
-
-      if (Platform.isAndroid) {
-        // ── Android: Native AlarmManager ONLY (No zonedSchedule) ──
-        // To satisfy the user's request: "just the sound, no notification panel".
-        // We only schedule the native AlarmManager alarm, which plays the sound
-        // via MediaPlayer in SalahSoundReceiver.
-        if (soundEnabled) {
-          try {
-            await scheduleNativeSalahAlarm(
-              id: id,
-              scheduledTime: fireAt,
-              soundAsset: soundAsset,
-              overrideSilent: overrideSilent,
-              intervalMinutes: interval,
-            );
-            scheduledCount++;
-            debugPrint('[Notifications] Salah slot id=$id native alarm OK.');
-          } catch (e) {
-            debugPrint('[Notifications] Salah slot id=$id native alarm FAILED: $e');
-          }
-        }
-      } else {
-        // ── iOS/other mobile: zonedSchedule() with notification sound ──
-        // iOS notification sound is reliable. The notification appears in
-        // the shade (expected on iOS for a reminder).
-        final tzTime = tz.TZDateTime.from(fireAt, tz.local);
-        try {
-          await _plugin.zonedSchedule(
-            id: id,
-            title: 'اللهم صل على محمد',
-            body: 'صلّوا على النبي ﷺ',
-            scheduledDate: tzTime,
-            notificationDetails: details,
-            androidScheduleMode: scheduleMode,
-            matchDateTimeComponents: DateTimeComponents.time,
-          );
-          scheduledCount++;
-          debugPrint('[Notifications] Salah slot id=$id zonedSchedule OK.');
-        } catch (e) {
-          debugPrint('[Notifications] Salah slot id=$id zonedSchedule FAILED: $e');
-        }
+      final tzTime = tz.TZDateTime.from(fireAt, tz.local);
+      try {
+        await _plugin.zonedSchedule(
+          id: id,
+          title: 'اللهم صل على محمد',
+          body: 'صلّوا على النبي ﷺ',
+          scheduledDate: tzTime,
+          notificationDetails: details,
+          androidScheduleMode: scheduleMode,
+          matchDateTimeComponents: DateTimeComponents.time,
+        );
+        scheduledCount++;
+      } catch (e) {
+        debugPrint('[Notifications] iOS Salah slot id=$id zonedSchedule FAILED: $e');
       }
     }
 
-    debugPrint('[Notifications] Scheduled $scheduledCount salah nabi reminders '
-        '(every $interval min, channel=$channelId, overrideSilent=$overrideSilent, '
-        'soundEnabled=$soundEnabled, platform=${Platform.isAndroid ? "android-dual" : "ios-zonedSchedule"}).');
+    debugPrint('[Notifications] Scheduled $scheduledCount iOS salah nabi reminders (every $interval min).');
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -672,42 +636,16 @@ class NotificationService {
     debugPrint('[Notifications] Streak warning scheduled for $fireAt.');
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // PREVIEW SOUND
-  // ══════════════════════════════════════════════════════════════════════════
-  static final AudioPlayer _previewPlayer = AudioPlayer();
-  static final Map<String, AudioPlayer> _preloadedPlayers = {};
-
-  static Future<void> preloadSounds() async {
-    for (final sound in ['salah_enhanced', 'salah_nabi']) {
-      try {
-        final player = AudioPlayer();
-        await player.setSource(AssetSource('sounds/$sound.mp3'));
-        _preloadedPlayers[sound] = player;
-        debugPrint('[Notifications] Preloaded sound asset: $sound');
-      } catch (e) {
-        debugPrint('[Notifications] Failed to preload sound $sound: $e');
-      }
-    }
-  }
+  static final AudioPlayer _previewPlayer = AudioPlayer()..setReleaseMode(ReleaseMode.stop);
 
   static Future<void> previewSalahSound(String soundAsset) async {
     try {
-      // Stop all preloaded players to prevent overlap
-      for (final player in _preloadedPlayers.values) {
-        await player.stop();
-      }
-      final preloaded = _preloadedPlayers[soundAsset];
-      if (preloaded != null) {
-        await preloaded.seek(Duration.zero);
-        await preloaded.resume();
-        debugPrint('[Notifications] Playing preloaded preview sound: $soundAsset');
-      } else {
-        // Fallback
-        await _previewPlayer.stop();
-        await _previewPlayer.play(AssetSource('sounds/$soundAsset.mp3'));
-        debugPrint('[Notifications] Playing on-the-fly preview sound: $soundAsset');
-      }
+      await _previewPlayer.stop();
+      await _previewPlayer.play(
+        AssetSource('sounds/$soundAsset.mp3'),
+        mode: PlayerMode.lowLatency,
+      );
+      debugPrint('[Notifications] Played preview sound: $soundAsset with lowLatency');
     } catch (e) {
       debugPrint('[Notifications] Preview failed: $e');
     }
@@ -806,21 +744,14 @@ class NotificationService {
     try {
       debugPrint('[Notifications] Sending test Salah notification...');
 
-      // ── Always play audio directly via preloaded player when soundEnabled.
+      // ── Always play audio directly via low-latency player when soundEnabled.
       if (soundEnabled) {
-        for (final p in _preloadedPlayers.values) {
-          await p.stop();
-        }
-        final player = _preloadedPlayers[soundAsset];
-        if (player != null) {
-          await player.seek(Duration.zero);
-          await player.resume();
-          debugPrint('[Notifications] Played preloaded test Salah sound: $soundAsset');
-        } else {
-          await _previewPlayer.stop();
-          await _previewPlayer.play(AssetSource('sounds/$soundAsset.mp3'));
-          debugPrint('[Notifications] Played fallback test Salah sound: $soundAsset');
-        }
+        await _previewPlayer.stop();
+        await _previewPlayer.play(
+          AssetSource('sounds/$soundAsset.mp3'),
+          mode: PlayerMode.lowLatency,
+        );
+        debugPrint('[Notifications] Played test Salah sound: $soundAsset');
       }
 
       // ── On mobile (iOS only!), show the notification to test the notification channel

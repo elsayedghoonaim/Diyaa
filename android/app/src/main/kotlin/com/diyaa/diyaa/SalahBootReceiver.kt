@@ -71,62 +71,49 @@ class SalahBootReceiver : BroadcastReceiver() {
 
             // Calculate the first slot time: next interval boundary after current time
             val firstSlotMinutes = ((minutesSinceMidnight / intervalMinutes) + 1) * intervalMinutes
-            val slotsPerDay = (24 * 60) / intervalMinutes
-            val totalSlots = slotsPerDay.coerceAtMost(ID_MAX - ID_BASE + 1)
+            val hour = firstSlotMinutes / 60
+            val minute = firstSlotMinutes % 60
 
-            var scheduledCount = 0
-            for (slot in 0 until totalSlots) {
-                val slotMinutes = (firstSlotMinutes + slot * intervalMinutes) % (24 * 60)
-                val hour = slotMinutes / 60
-                val minute = slotMinutes % 60
+            // Calculate the fire time for this slot
+            val fireAt = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, hour)
+                set(Calendar.MINUTE, minute)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
 
-                // Calculate the fire time for this slot
-                val fireAt = Calendar.getInstance().apply {
-                    set(Calendar.HOUR_OF_DAY, hour)
-                    set(Calendar.MINUTE, minute)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
-                }
+            // If the fire time is in the past, schedule for tomorrow
+            if (fireAt.timeInMillis <= System.currentTimeMillis()) {
+                fireAt.add(Calendar.DAY_OF_YEAR, 1)
+            }
 
-                // If the fire time is in the past, schedule for tomorrow
-                if (fireAt.timeInMillis <= System.currentTimeMillis()) {
-                    fireAt.add(Calendar.DAY_OF_YEAR, 1)
-                }
+            val id = ID_BASE
+            val scheduledTimeMillis = fireAt.timeInMillis
 
-                val id = ID_BASE + slot
-                val scheduledTimeMillis = fireAt.timeInMillis
+            // Create PendingIntent with all config for auto-rescheduling
+            val alarmIntent = Intent(context, SalahSoundReceiver::class.java).apply {
+                putExtra("id", id)
+                putExtra("soundAsset", soundAsset)
+                putExtra("overrideSilent", overrideSilent)
+                putExtra("intervalMinutes", intervalMinutes)
+                putExtra("scheduledTimeMillis", scheduledTimeMillis)
+            }
 
-                // Create PendingIntent with all config for auto-rescheduling
-                val alarmIntent = Intent(context, SalahSoundReceiver::class.java).apply {
-                    putExtra("id", id)
-                    putExtra("soundAsset", soundAsset)
-                    putExtra("overrideSilent", overrideSilent)
-                    putExtra("intervalMinutes", intervalMinutes)
-                    putExtra("scheduledTimeMillis", scheduledTimeMillis)
-                }
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                id + 10000,
+                alarmIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
 
-                val pendingIntent = PendingIntent.getBroadcast(
-                    context,
-                    id + 10000,
-                    alarmIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-
-                // Schedule the alarm
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    if (!alarmManager.canScheduleExactAlarms()) {
-                        alarmManager.setAndAllowWhileIdle(
-                            AlarmManager.RTC_WAKEUP,
-                            scheduledTimeMillis,
-                            pendingIntent
-                        )
-                    } else {
-                        alarmManager.setExactAndAllowWhileIdle(
-                            AlarmManager.RTC_WAKEUP,
-                            scheduledTimeMillis,
-                            pendingIntent
-                        )
-                    }
+            // Schedule the alarm
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (!alarmManager.canScheduleExactAlarms()) {
+                    alarmManager.setAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        scheduledTimeMillis,
+                        pendingIntent
+                    )
                 } else {
                     alarmManager.setExactAndAllowWhileIdle(
                         AlarmManager.RTC_WAKEUP,
@@ -134,12 +121,16 @@ class SalahBootReceiver : BroadcastReceiver() {
                         pendingIntent
                     )
                 }
-
-                scheduledCount++
+            } else {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    scheduledTimeMillis,
+                    pendingIntent
+                )
             }
 
-            android.util.Log.d("Diyaa", "[SalahBoot] Rescheduled $scheduledCount native alarms "
-                + "(every $intervalMinutes min, sound=$soundAsset, overrideSilent=$overrideSilent)")
+            android.util.Log.d("Diyaa", "[SalahBoot] Rescheduled single native alarm (id=$id) "
+                + "at ${fireAt.time} (every $intervalMinutes min, sound=$soundAsset, overrideSilent=$overrideSilent)")
         } finally {
             if (wakeLock.isHeld) wakeLock.release()
         }

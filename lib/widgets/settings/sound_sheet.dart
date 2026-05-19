@@ -150,14 +150,19 @@ class _SoundSheetState extends State<SoundSheet> {
 
                   return GestureDetector(
                     onTap: () async {
-                      // Select the sound in provider
-                      await provider.setSalahSound(sound.id);
-                      // Auto-play preview
-                      setState(() => _playingId = sound.id);
-                      await NotificationService.previewSalahSound(sound.id);
+                      final soundId = sound.id;
+                      // 1. Instantly trigger state update for the spinner/icon
+                      setState(() => _playingId = soundId);
+
+                      // 2. Play the preview sound immediately and concurrently
+                      NotificationService.previewSalahSound(soundId);
+
+                      // 3. Update the provider settings in the background
+                      provider.setSalahSound(soundId);
+
                       // Clear playing indicator after sound finishes (~5s)
                       Future.delayed(const Duration(seconds: 5), () {
-                        if (mounted && _playingId == sound.id) {
+                        if (mounted && _playingId == soundId) {
                           setState(() => _playingId = null);
                         }
                       });
