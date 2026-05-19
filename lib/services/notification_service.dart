@@ -82,6 +82,10 @@ class NotificationService {
     );
 
     if (_isMobile) await _createAndroidChannels();
+
+    // Preload sound assets for instant previewing
+    await preloadSounds();
+
     debugPrint('[Notifications] Initialized (ok=$ok). Mobile: $_isMobile');
   }
 
@@ -591,32 +595,11 @@ class NotificationService {
       final id = _idSalahBase + slot;
 
       if (Platform.isAndroid) {
-        // ── Android: Dual-path — zonedSchedule() + native AlarmManager ──
-        // zonedSchedule() is the PRIMARY sound mechanism. The notification
-        // channel sound is handled by the Android system itself, works even
-        // when the app process is dead, and matches the test path configuration.
-        // Native AlarmManager provides BACKUP via MediaPlayer in
-        // SalahSoundReceiver for cases where the notification channel sound
-        // is suppressed (e.g., DND mode with overrideSilent).
-        // Brief sound overlap is acceptable — the user hears the sound reliably.
+        // ── Android: Native AlarmManager ONLY (No zonedSchedule) ──
+        // To satisfy the user's request: "just the sound, no notification panel".
+        // We only schedule the native AlarmManager alarm, which plays the sound
+        // via MediaPlayer in SalahSoundReceiver.
         if (soundEnabled) {
-          final tzTime = tz.TZDateTime.from(fireAt, tz.local);
-          try {
-            await _plugin.zonedSchedule(
-              id: id,
-              title: 'اللهم صل على محمد',
-              body: 'صلّوا على النبي ﷺ',
-              scheduledDate: tzTime,
-              notificationDetails: details,
-              androidScheduleMode: scheduleMode,
-              matchDateTimeComponents: DateTimeComponents.time,
-            );
-            scheduledCount++;
-            debugPrint('[Notifications] Salah slot id=$id zonedSchedule OK.');
-          } catch (e) {
-            debugPrint('[Notifications] Salah slot id=$id zonedSchedule FAILED: $e');
-          }
-          // Native AlarmManager backup for sound playback
           try {
             await scheduleNativeSalahAlarm(
               id: id,
@@ -625,9 +608,10 @@ class NotificationService {
               overrideSilent: overrideSilent,
               intervalMinutes: interval,
             );
-            debugPrint('[Notifications] Salah slot id=$id native alarm backup OK.');
+            scheduledCount++;
+            debugPrint('[Notifications] Salah slot id=$id native alarm OK.');
           } catch (e) {
-            debugPrint('[Notifications] Salah slot id=$id native alarm backup FAILED: $e');
+            debugPrint('[Notifications] Salah slot id=$id native alarm FAILED: $e');
           }
         }
       } else {
@@ -692,11 +676,38 @@ class NotificationService {
   // PREVIEW SOUND
   // ══════════════════════════════════════════════════════════════════════════
   static final AudioPlayer _previewPlayer = AudioPlayer();
+  static final Map<String, AudioPlayer> _preloadedPlayers = {};
+
+  static Future<void> preloadSounds() async {
+    for (final sound in ['salah_enhanced', 'salah_nabi']) {
+      try {
+        final player = AudioPlayer();
+        await player.setSource(AssetSource('sounds/$sound.mp3'));
+        _preloadedPlayers[sound] = player;
+        debugPrint('[Notifications] Preloaded sound asset: $sound');
+      } catch (e) {
+        debugPrint('[Notifications] Failed to preload sound $sound: $e');
+      }
+    }
+  }
 
   static Future<void> previewSalahSound(String soundAsset) async {
     try {
-      await _previewPlayer.stop();
-      await _previewPlayer.play(AssetSource('sounds/$soundAsset.mp3'));
+      // Stop all preloaded players to prevent overlap
+      for (final player in _preloadedPlayers.values) {
+        await player.stop();
+      }
+      final preloaded = _preloadedPlayers[soundAsset];
+      if (preloaded != null) {
+        await preloaded.seek(Duration.zero);
+        await preloaded.resume();
+        debugPrint('[Notifications] Playing preloaded preview sound: $soundAsset');
+      } else {
+        // Fallback
+        await _previewPlayer.stop();
+        await _previewPlayer.play(AssetSource('sounds/$soundAsset.mp3'));
+        debugPrint('[Notifications] Playing on-the-fly preview sound: $soundAsset');
+      }
     } catch (e) {
       debugPrint('[Notifications] Preview failed: $e');
     }
@@ -795,58 +806,27 @@ class NotificationService {
     try {
       debugPrint('[Notifications] Sending test Salah notification...');
 
-      // ── FIX: Always play audio directly via AudioPlayer when soundEnabled.
-      // The notification system's sound playback is unreliable:
-      //   * On Windows, custom notification sounds aren't supported at all
-      //   * On Android, sound can be suppressed by DND/silent mode or missing perms
-      //   * Direct audio playback ensures the user hears the sound immediately.
+      // ── Always play audio directly via preloaded player when soundEnabled.
       if (soundEnabled) {
-        await _previewPlayer.stop();
-        await _previewPlayer.play(AssetSource('sounds/$soundAsset.mp3'));
+        for (final p in _preloadedPlayers.values) {
+          await p.stop();
+        }
+        final player = _preloadedPlayers[soundAsset];
+        if (player != null) {
+          await player.seek(Duration.zero);
+          await player.resume();
+          debugPrint('[Notifications] Played preloaded test Salah sound: $soundAsset');
+        } else {
+          await _previewPlayer.stop();
+          await _previewPlayer.play(AssetSource('sounds/$soundAsset.mp3'));
+          debugPrint('[Notifications] Played fallback test Salah sound: $soundAsset');
+        }
       }
 
-      // ── On mobile, also show the notification to test the notification channel
-      if (_isMobile) {
+      // ── On mobile (iOS only!), show the notification to test the notification channel
+      if (_isMobile && Platform.isIOS) {
         // Ensure permissions are granted before showing the notification
         await requestPermissions();
-
-        // FIX (A4): Use alarm-level channel when overrideSilent=true,
-        // same as scheduleSalahNabiReminders(). Also use channelAction.update
-        // to force channel update at fire time. Importance.high avoids
-        // USE_FULL_SCREEN_INTENT permission requirement. Visibility.secret
-        // hides content in shade.
-        final testChannelId = soundEnabled
-            ? (overrideSilent ? 'diyaa_salah_${soundAsset}_alarm' : 'diyaa_salah_$soundAsset')
-            : 'diyaa_salah_silent';
-        final testChannelName = soundEnabled
-            ? (overrideSilent
-                ? 'Al-Salah Ala Al-Nabi — Alarm'
-                : 'Al-Salah Ala Al-Nabi')
-            : 'Al-Salah Ala Al-Nabi (Silent)';
-        final androidDetails = AndroidNotificationDetails(
-          testChannelId,
-          testChannelName,
-          importance: soundEnabled ? Importance.high : Importance.min,
-          priority: soundEnabled ? Priority.high : Priority.min,
-          channelAction: AndroidNotificationChannelAction.update,
-          // Use Visibility.private to match the scheduled reminders path.
-          visibility: NotificationVisibility.private,
-          playSound: soundEnabled,
-          sound: soundEnabled
-              ? RawResourceAndroidNotificationSound(soundAsset)
-              : null,
-          audioAttributesUsage: overrideSilent
-              ? AudioAttributesUsage.alarm
-              : AudioAttributesUsage.notification,
-          category: overrideSilent
-              ? AndroidNotificationCategory.alarm
-              : AndroidNotificationCategory.reminder,
-          enableVibration: false,
-          showWhen: false,
-          ongoing: false,
-          silent: !soundEnabled,
-          icon: '@mipmap/launcher_icon',
-        );
 
         final iosDetails = DarwinNotificationDetails(
           presentAlert: false,
@@ -859,7 +839,7 @@ class NotificationService {
           title: 'اللهم صل على محمد',
           body: 'صلّوا على النبي ﷺ',
           notificationDetails: NotificationDetails(
-              android: androidDetails, iOS: iosDetails),
+              android: null, iOS: iosDetails),
         );
       }
 

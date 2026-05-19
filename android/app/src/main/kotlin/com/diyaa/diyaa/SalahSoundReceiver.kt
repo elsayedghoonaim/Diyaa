@@ -106,6 +106,27 @@ class SalahSoundReceiver : BroadcastReceiver() {
         // Play the sound via MediaPlayer
         val mediaPlayer = MediaPlayer()
         mediaPlayer.setWakeMode(context, PowerManager.PARTIAL_WAKE_LOCK) // Ensure CPU stays awake during preparation & playback
+
+        // If overrideSilent is enabled and Alarm volume is 0 or muted, temporarily raise it and restore afterwards
+        var originalAlarmVolume = -1
+        if (overrideSilent) {
+            try {
+                originalAlarmVolume = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
+                // Unmute the alarm stream
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    audioManager.adjustStreamVolume(AudioManager.STREAM_ALARM, AudioManager.ADJUST_UNMUTE, 0)
+                }
+                if (originalAlarmVolume == 0) {
+                    val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+                    val targetVol = (maxVol * 0.6).toInt().coerceAtLeast(1)
+                    audioManager.setStreamVolume(AudioManager.STREAM_ALARM, targetVol, 0)
+                    Log.d(TAG, "overrideSilent=true and STREAM_ALARM volume is 0. Temporarily set to $targetVol (max: $maxVol)")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to temporarily adjust STREAM_ALARM volume: ${e.message}")
+            }
+        }
+
         try {
             // Use USAGE_ALARM when overrideSilent=true (bypasses DND/silent mode),
             // and USAGE_NOTIFICATION_RINGTONE when overrideSilent=false.
@@ -135,6 +156,7 @@ class SalahSoundReceiver : BroadcastReceiver() {
                     Log.d(TAG, "MediaPlayer completed for id=$alarmId")
                     mp.release()
                     abandonAudioFocus(audioManager, overrideSilent)
+                    restoreAlarmVolume(audioManager, originalAlarmVolume)
                     rescheduleAlarm(context, alarmId, scheduledTimeMillis, intervalMinutes,
                         soundAsset, overrideSilent)
                     if (wakeLock.isHeld) wakeLock.release()
@@ -144,6 +166,7 @@ class SalahSoundReceiver : BroadcastReceiver() {
                     Log.e(TAG, "MediaPlayer error for id=$alarmId: what=$what, extra=$extra")
                     mp.release()
                     abandonAudioFocus(audioManager, overrideSilent)
+                    restoreAlarmVolume(audioManager, originalAlarmVolume)
                     // Still reschedule even if playback failed — don't break the chain
                     rescheduleAlarm(context, alarmId, scheduledTimeMillis, intervalMinutes,
                         soundAsset, overrideSilent)
@@ -161,6 +184,7 @@ class SalahSoundReceiver : BroadcastReceiver() {
                 // Resource not found — still reschedule
                 mediaPlayer.release()
                 abandonAudioFocus(audioManager, overrideSilent)
+                restoreAlarmVolume(audioManager, originalAlarmVolume)
                 rescheduleAlarm(context, alarmId, scheduledTimeMillis, intervalMinutes,
                     soundAsset, overrideSilent)
                 if (wakeLock.isHeld) wakeLock.release()
@@ -170,6 +194,7 @@ class SalahSoundReceiver : BroadcastReceiver() {
             Log.e(TAG, "IOException during MediaPlayer for id=$alarmId: ${e.message}")
             mediaPlayer.release()
             abandonAudioFocus(audioManager, overrideSilent)
+            restoreAlarmVolume(audioManager, originalAlarmVolume)
             rescheduleAlarm(context, alarmId, scheduledTimeMillis, intervalMinutes,
                 soundAsset, overrideSilent)
             if (wakeLock.isHeld) wakeLock.release()
@@ -178,6 +203,7 @@ class SalahSoundReceiver : BroadcastReceiver() {
             Log.e(TAG, "Exception during MediaPlayer for id=$alarmId: ${e.message}")
             mediaPlayer.release()
             abandonAudioFocus(audioManager, overrideSilent)
+            restoreAlarmVolume(audioManager, originalAlarmVolume)
             rescheduleAlarm(context, alarmId, scheduledTimeMillis, intervalMinutes,
                 soundAsset, overrideSilent)
             if (wakeLock.isHeld) wakeLock.release()
@@ -340,6 +366,23 @@ class SalahSoundReceiver : BroadcastReceiver() {
                 alarmManager.cancel(pendingIntent)
                 pendingIntent.cancel()
                 Log.d(TAG, "Cancelled alarm requestCode=$requestCode for id=$alarmId")
+            }
+        }
+    }
+
+    /**
+     * Restore the original Alarm stream volume and mute state.
+     */
+    private fun restoreAlarmVolume(audioManager: AudioManager, originalVolume: Int) {
+        if (originalVolume >= 0) {
+            try {
+                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, originalVolume, 0)
+                if (originalVolume == 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    audioManager.adjustStreamVolume(AudioManager.STREAM_ALARM, AudioManager.ADJUST_MUTE, 0)
+                }
+                Log.d(TAG, "Restored STREAM_ALARM volume to $originalVolume")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to restore STREAM_ALARM volume: ${e.message}")
             }
         }
     }
