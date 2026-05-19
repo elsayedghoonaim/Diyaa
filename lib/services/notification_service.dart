@@ -1,4 +1,5 @@
 import 'dart:io' show Platform;
+import 'dart:async' show Timer;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -448,7 +449,11 @@ class NotificationService {
     required bool overrideSilent,
     required bool soundEnabled,
   }) async {
-    if (!_isMobile) return;
+    // Start or stop the desktop timer for Windows/desktop platforms
+    if (!_isMobile) {
+      _startDesktopSalahTimer(enabled, soundAsset, intervalMinutes, soundEnabled);
+      return;
+    }
 
     // FIX: Request permissions before scheduling. Without this, if the user
     // toggles Salah Nabi on for the first time or permissions were revoked,
@@ -514,20 +519,24 @@ class NotificationService {
       importance: soundEnabled ? Importance.high : Importance.min,
       priority: soundEnabled ? Priority.high : Priority.min,
       channelAction: AndroidNotificationChannelAction.update,
-      // FIX: Always use Visibility.secret for Salah Nabi — this is a periodic
-      // sound reminder (every 5-60 min). Visibility.public would fill the shade
-      // with visible notifications. Visibility.secret hides the content while
-      // still allowing the Importance.high channel to play sound.
-      visibility: NotificationVisibility.secret,
-      // FIX: Disable notification channel sound for scheduled Salah on Android.
-      // The native MediaPlayer (via SalahSoundReceiver) handles sound playback
-      // reliably. The notification channel sound is unreliable (the whole reason
-      // for the native alarm fix). Setting playSound:false + silent:true + sound:null
-      // prevents the channel from playing sound, avoiding overlap with MediaPlayer.
-      // The notification still appears visually (title, body, icon) via the channel's
-      // importance level and other properties.
-      playSound: false,
-      sound: null,
+      // FIX: Use Visibility.private for Salah Nabi — this shows the notification
+      // on the lockscreen but hides sensitive content details. This allows the
+      // high-importance channel to play sound reliably even when the device is locked,
+      // while maintaining privacy. Using Visibility.secret would completely suppress the
+      // notification and sound on secure lockscreens.
+      visibility: NotificationVisibility.private,
+      // FIX: Enable notification channel sound for scheduled Salah on Android.
+      // The notification channel sound is the standard, reliable Android mechanism
+      // for playing sounds at scheduled times — it's handled by the system itself,
+      // not by the app's process. This matches the test path configuration exactly.
+      // The native MediaPlayer (via SalahSoundReceiver) provides backup for cases
+      // where the notification channel sound is suppressed (e.g., DND mode).
+      // Brief sound overlap between channel sound and MediaPlayer is acceptable —
+      // the user hears the sound reliably, which is the goal.
+      playSound: soundEnabled,
+      sound: soundEnabled
+          ? RawResourceAndroidNotificationSound(soundAsset)
+          : null,
       audioAttributesUsage: overrideSilent
           ? AudioAttributesUsage.alarm
           : AudioAttributesUsage.notification,
@@ -537,7 +546,7 @@ class NotificationService {
       enableVibration: false,
       showWhen: false,
       ongoing: false,
-      silent: true,
+      silent: !soundEnabled,
       icon: '@mipmap/launcher_icon',
     );
 
@@ -553,10 +562,15 @@ class NotificationService {
 
     final details = NotificationDetails(android: androidDetails, iOS: iosDetails);
 
-    // androidScheduleMode is only used on iOS (where it's ignored by the OS
-    // but required by the plugin API). On Android, we use native AlarmManager
-    // alarms which handle their own exact-alarm permission check in MainActivity.
-    const scheduleMode = AndroidScheduleMode.exactAllowWhileIdle;
+    // androidScheduleMode is used by zonedSchedule() on both Android and iOS.
+    // On Android, exactAllowWhileIdle ensures the notification fires at the
+    // exact scheduled time even when the device is in Doze/idle mode.
+    // Fall back to inexact schedule mode if exact alarms permission is not granted,
+    // avoiding security exceptions.
+    final canExact = await canScheduleExact();
+    final scheduleMode = canExact
+        ? AndroidScheduleMode.exactAllowWhileIdle
+        : AndroidScheduleMode.inexactAllowWhileIdle;
 
     // Schedule one slot per interval, starting from the next interval boundary
     final now = DateTime.now();
@@ -577,12 +591,32 @@ class NotificationService {
       final id = _idSalahBase + slot;
 
       if (Platform.isAndroid) {
-        // ── Android: Native AlarmManager + MediaPlayer only ──
-        // No zonedSchedule() — this eliminates the unwanted visible notification
-        // in the shade. Sound plays via MediaPlayer in SalahSoundReceiver,
-        // which auto-reschedules daily for ongoing reminders.
-        // When soundEnabled=false: no alarm scheduled (completely silent).
+        // ── Android: Dual-path — zonedSchedule() + native AlarmManager ──
+        // zonedSchedule() is the PRIMARY sound mechanism. The notification
+        // channel sound is handled by the Android system itself, works even
+        // when the app process is dead, and matches the test path configuration.
+        // Native AlarmManager provides BACKUP via MediaPlayer in
+        // SalahSoundReceiver for cases where the notification channel sound
+        // is suppressed (e.g., DND mode with overrideSilent).
+        // Brief sound overlap is acceptable — the user hears the sound reliably.
         if (soundEnabled) {
+          final tzTime = tz.TZDateTime.from(fireAt, tz.local);
+          try {
+            await _plugin.zonedSchedule(
+              id: id,
+              title: 'اللهم صل على محمد',
+              body: 'صلّوا على النبي ﷺ',
+              scheduledDate: tzTime,
+              notificationDetails: details,
+              androidScheduleMode: scheduleMode,
+              matchDateTimeComponents: DateTimeComponents.time,
+            );
+            scheduledCount++;
+            debugPrint('[Notifications] Salah slot id=$id zonedSchedule OK.');
+          } catch (e) {
+            debugPrint('[Notifications] Salah slot id=$id zonedSchedule FAILED: $e');
+          }
+          // Native AlarmManager backup for sound playback
           try {
             await scheduleNativeSalahAlarm(
               id: id,
@@ -591,10 +625,9 @@ class NotificationService {
               overrideSilent: overrideSilent,
               intervalMinutes: interval,
             );
-            scheduledCount++;
-            debugPrint('[Notifications] Salah slot id=$id native alarm OK.');
+            debugPrint('[Notifications] Salah slot id=$id native alarm backup OK.');
           } catch (e) {
-            debugPrint('[Notifications] Salah slot id=$id native alarm FAILED: $e');
+            debugPrint('[Notifications] Salah slot id=$id native alarm backup FAILED: $e');
           }
         }
       } else {
@@ -622,7 +655,7 @@ class NotificationService {
 
     debugPrint('[Notifications] Scheduled $scheduledCount salah nabi reminders '
         '(every $interval min, channel=$channelId, overrideSilent=$overrideSilent, '
-        'soundEnabled=$soundEnabled, platform=${Platform.isAndroid ? "android-native" : "ios-zonedSchedule"}).');
+        'soundEnabled=$soundEnabled, platform=${Platform.isAndroid ? "android-dual" : "ios-zonedSchedule"}).');
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -667,6 +700,48 @@ class NotificationService {
     } catch (e) {
       debugPrint('[Notifications] Preview failed: $e');
     }
+  }
+
+  // ── Desktop/Windows Timer ──
+  static final AudioPlayer _salahPlayer = AudioPlayer();
+  static Timer? _desktopSalahTimer;
+
+  static void _startDesktopSalahTimer(
+      bool enabled, String soundAsset, int intervalMinutes, bool soundEnabled) {
+    _desktopSalahTimer?.cancel();
+    _desktopSalahTimer = null;
+
+    if (!enabled || !soundEnabled || _isMobile) return;
+
+    debugPrint('[Notifications] Starting desktop periodic timer for Salah sound ($soundAsset) every $intervalMinutes min.');
+
+    void scheduleNext() {
+      _desktopSalahTimer?.cancel();
+
+      final now = DateTime.now();
+      final intervalMs = intervalMinutes * 60 * 1000;
+      final currentMs = now.millisecondsSinceEpoch;
+
+      // Calculate next exact boundary
+      final nextBoundaryMs = ((currentMs ~/ intervalMs) + 1) * intervalMs;
+      final delay = Duration(milliseconds: nextBoundaryMs - currentMs);
+
+      debugPrint('[Notifications] Next desktop reminder scheduled in ${(delay.inMilliseconds / 1000).toStringAsFixed(1)}s (at ${DateTime.fromMillisecondsSinceEpoch(nextBoundaryMs)})');
+
+      _desktopSalahTimer = Timer(delay, () async {
+        try {
+          await _salahPlayer.stop();
+          await _salahPlayer.play(AssetSource('sounds/$soundAsset.mp3'));
+          debugPrint('[Notifications] Played Salah sound on desktop: $soundAsset');
+        } catch (e) {
+          debugPrint('[Notifications] Playing Salah sound failed: $e');
+        }
+        // Reschedule recursively to keep exact clock boundaries
+        scheduleNext();
+      });
+    }
+
+    scheduleNext();
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -754,7 +829,8 @@ class NotificationService {
           importance: soundEnabled ? Importance.high : Importance.min,
           priority: soundEnabled ? Priority.high : Priority.min,
           channelAction: AndroidNotificationChannelAction.update,
-          visibility: NotificationVisibility.secret,
+          // Use Visibility.private to match the scheduled reminders path.
+          visibility: NotificationVisibility.private,
           playSound: soundEnabled,
           sound: soundEnabled
               ? RawResourceAndroidNotificationSound(soundAsset)

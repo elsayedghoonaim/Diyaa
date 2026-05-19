@@ -10,7 +10,6 @@ import '../widgets/settings/setting_row.dart';
 import '../widgets/settings/city_sheet.dart';
 import '../widgets/settings/privacy_sheet.dart';
 import '../widgets/settings/sound_sheet.dart';
-import '../services/notification_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -471,39 +470,6 @@ class _SalahNabiSection extends StatelessWidget {
               onToggle: () => provider.setSalahOverrideSilent(!provider.salahOverrideSilent),
               teal: teal,
             ),
-            isLast: false,
-          ),
-
-          // Test button
-          SettingRow(
-            icon: Icons.bug_report_outlined,
-            iconColor: gold,
-            iconBgMode: 'gold',
-            label: 'Test Salah Audio',
-            arLabel: 'اختبار صوت الصلاة',
-            sublabel: t('Tap to test the audio right now', 'اضغط لاختبار الصوت الآن'),
-            rightWidget: Icon(arabic ? Icons.chevron_left : Icons.chevron_right, size: 16, color: textSecondary),
-            onTap: () async {
-              try {
-                await NotificationService.sendTestSalahNotification(
-                  isArabic: arabic,
-                  soundAsset: provider.salahSound,
-                  overrideSilent: provider.salahOverrideSilent,
-                  soundEnabled: provider.soundEnabled, // FIX: now passed through
-                );
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(t('Test notification sent! ✅', 'تم إرسال إشعار تجريبي! ✅'))),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(t('Failed: $e', 'فشل: $e'))),
-                  );
-                }
-              }
-            },
             isLast: true,
           ),
         ],

@@ -38,9 +38,10 @@ import java.io.IOException
  *   Doze/sleep mode when the alarm fires.
  * - Requests AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK before playing to ensure
  *   the sound is audible even when another app holds audio focus.
- * - Always uses USAGE_ALARM for MediaPlayer audio attributes. This ensures
- *   the sound plays even in Doze/silent mode, matching the reliability of
- *   the test path which uses audioplayers (USAGE_MEDIA).
+ * - Uses USAGE_ALARM when overrideSilent=true (bypasses DND/silent mode)
+ *   and USAGE_MEDIA when overrideSilent=false (matches the test path's
+ *   volume stream — STREAM_MUSIC). The notification channel sound is the
+ *   PRIMARY mechanism; this MediaPlayer is BACKUP for DND/silent override.
  */
 class SalahSoundReceiver : BroadcastReceiver() {
     companion object {
@@ -104,13 +105,19 @@ class SalahSoundReceiver : BroadcastReceiver() {
 
         // Play the sound via MediaPlayer
         val mediaPlayer = MediaPlayer()
+        mediaPlayer.setWakeMode(context, PowerManager.PARTIAL_WAKE_LOCK) // Ensure CPU stays awake during preparation & playback
         try {
-            // Always use USAGE_ALARM for MediaPlayer audio attributes.
-            // USAGE_NOTIFICATION can be suppressed in Doze/background by Android's
-            // audio policy. The test path uses USAGE_MEDIA (via audioplayers) which
-            // always gets focus. USAGE_ALARM ensures the sound plays even in Doze.
+            // Use USAGE_ALARM when overrideSilent=true (bypasses DND/silent mode),
+            // and USAGE_NOTIFICATION_RINGTONE when overrideSilent=false.
+            // Bypasses Android 9+ background media playback restrictions by using
+            // a notification alert stream rather than the interactive music stream (USAGE_MEDIA).
+            val usage = if (overrideSilent) {
+                AudioAttributes.USAGE_ALARM
+            } else {
+                AudioAttributes.USAGE_NOTIFICATION_RINGTONE
+            }
             val audioAttributes = AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setUsage(usage)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build()
             mediaPlayer.setAudioAttributes(audioAttributes)
@@ -127,7 +134,7 @@ class SalahSoundReceiver : BroadcastReceiver() {
                 mediaPlayer.setOnCompletionListener { mp ->
                     Log.d(TAG, "MediaPlayer completed for id=$alarmId")
                     mp.release()
-                    abandonAudioFocus(audioManager)
+                    abandonAudioFocus(audioManager, overrideSilent)
                     rescheduleAlarm(context, alarmId, scheduledTimeMillis, intervalMinutes,
                         soundAsset, overrideSilent)
                     if (wakeLock.isHeld) wakeLock.release()
@@ -136,7 +143,7 @@ class SalahSoundReceiver : BroadcastReceiver() {
                 mediaPlayer.setOnErrorListener { mp, what, extra ->
                     Log.e(TAG, "MediaPlayer error for id=$alarmId: what=$what, extra=$extra")
                     mp.release()
-                    abandonAudioFocus(audioManager)
+                    abandonAudioFocus(audioManager, overrideSilent)
                     // Still reschedule even if playback failed — don't break the chain
                     rescheduleAlarm(context, alarmId, scheduledTimeMillis, intervalMinutes,
                         soundAsset, overrideSilent)
@@ -153,7 +160,7 @@ class SalahSoundReceiver : BroadcastReceiver() {
                 Log.e(TAG, "Resource NOT found: $soundAsset → resourceId=0")
                 // Resource not found — still reschedule
                 mediaPlayer.release()
-                abandonAudioFocus(audioManager)
+                abandonAudioFocus(audioManager, overrideSilent)
                 rescheduleAlarm(context, alarmId, scheduledTimeMillis, intervalMinutes,
                     soundAsset, overrideSilent)
                 if (wakeLock.isHeld) wakeLock.release()
@@ -162,7 +169,7 @@ class SalahSoundReceiver : BroadcastReceiver() {
         } catch (e: IOException) {
             Log.e(TAG, "IOException during MediaPlayer for id=$alarmId: ${e.message}")
             mediaPlayer.release()
-            abandonAudioFocus(audioManager)
+            abandonAudioFocus(audioManager, overrideSilent)
             rescheduleAlarm(context, alarmId, scheduledTimeMillis, intervalMinutes,
                 soundAsset, overrideSilent)
             if (wakeLock.isHeld) wakeLock.release()
@@ -170,7 +177,7 @@ class SalahSoundReceiver : BroadcastReceiver() {
         } catch (e: Exception) {
             Log.e(TAG, "Exception during MediaPlayer for id=$alarmId: ${e.message}")
             mediaPlayer.release()
-            abandonAudioFocus(audioManager)
+            abandonAudioFocus(audioManager, overrideSilent)
             rescheduleAlarm(context, alarmId, scheduledTimeMillis, intervalMinutes,
                 soundAsset, overrideSilent)
             if (wakeLock.isHeld) wakeLock.release()
@@ -184,6 +191,18 @@ class SalahSoundReceiver : BroadcastReceiver() {
      * ducks rather than stops, and our sound is guaranteed to be heard.
      */
     private fun requestAudioFocus(audioManager: AudioManager, overrideSilent: Boolean): Int {
+        // Match the MediaPlayer's audio attributes: USAGE_ALARM when overrideSilent,
+        // USAGE_NOTIFICATION_RINGTONE otherwise. Bypasses background focus limits on USAGE_MEDIA.
+        val usage = if (overrideSilent) {
+            AudioAttributes.USAGE_ALARM
+        } else {
+            AudioAttributes.USAGE_NOTIFICATION_RINGTONE
+        }
+        val streamType = if (overrideSilent) {
+            AudioManager.STREAM_ALARM
+        } else {
+            AudioManager.STREAM_RING
+        }
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
                 .setOnAudioFocusChangeListener { focusChange ->
@@ -191,7 +210,7 @@ class SalahSoundReceiver : BroadcastReceiver() {
                 }
                 .setAudioAttributes(
                     AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setUsage(usage)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .build()
                 )
@@ -201,7 +220,7 @@ class SalahSoundReceiver : BroadcastReceiver() {
             @Suppress("DEPRECATION")
             audioManager.requestAudioFocus(
                 { focusChange -> Log.d(TAG, "Audio focus change (legacy): $focusChange") },
-                AudioManager.STREAM_ALARM,
+                streamType,
                 AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
             )
         }
@@ -210,15 +229,18 @@ class SalahSoundReceiver : BroadcastReceiver() {
     /**
      * Abandon audio focus after playback completes or fails.
      */
-    private fun abandonAudioFocus(audioManager: AudioManager) {
+    private fun abandonAudioFocus(audioManager: AudioManager, overrideSilent: Boolean) {
+        // Match the requestAudioFocus attributes for proper abandonment.
+        val usage = if (overrideSilent) {
+            AudioAttributes.USAGE_ALARM
+        } else {
+            AudioAttributes.USAGE_NOTIFICATION_RINGTONE
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // We need the focusRequest to abandon, but it was created in requestAudioFocus.
-            // For simplicity, we use the AudioManager.abandonAudioFocusRequest with a new
-            // request matching the same attributes — Android matches by attributes.
             val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
                 .setAudioAttributes(
                     AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setUsage(usage)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .build()
                 )
@@ -228,7 +250,7 @@ class SalahSoundReceiver : BroadcastReceiver() {
             @Suppress("DEPRECATION")
             audioManager.abandonAudioFocus(null)
         }
-        Log.d(TAG, "Audio focus abandoned")
+        Log.d(TAG, "Audio focus abandoned (overrideSilent=$overrideSilent)")
     }
 
     /**
