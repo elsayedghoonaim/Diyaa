@@ -69,13 +69,14 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadSessions() async {
     try {
       final String raw = await rootBundle.loadString('assets/azkar.txt');
-      final Map<String, dynamic> data = json.decode(raw) as Map<String, dynamic>;
+      final Map<String, dynamic> data =
+          json.decode(raw) as Map<String, dynamic>;
       final List<String> chronologicalKeys = <String>[
         'أذكار الاستيقاظ',
         'أذكار الصباح',
         'أذكار بعد السلام من الصلاة المفروضة',
         'أذكار المساء',
-        'أذكار النوم'
+        'أذكار النوم',
       ];
       final List<_Session> loadedSessions = <_Session>[];
       for (final String key in chronologicalKeys) {
@@ -91,17 +92,20 @@ class _HomeScreenState extends State<HomeScreen> {
           }
           final String nameEn = _getEnglishCategoryName(key);
           final String jsonId = _getJsonIdForCategory(key);
-          loadedSessions.add(_Session(
-            nameEn: nameEn,
-            nameAr: key,
-            descEn: '$count Adhkar',
-            descAr: '${ar.toArabicDigits(count.toString(), isArabic: true)} ذكراً',
-            actionEn: 'Start',
-            actionAr: 'ابدأ',
-            jsonId: jsonId,
-            progress: 0.0,
-            state: 'ready',
-          ));
+          loadedSessions.add(
+            _Session(
+              nameEn: nameEn,
+              nameAr: key,
+              descEn: '$count Adhkar',
+              descAr:
+                  '${ar.toArabicDigits(count.toString(), isArabic: true)} ذكراً',
+              actionEn: 'Start',
+              actionAr: 'ابدأ',
+              jsonId: jsonId,
+              progress: 0.0,
+              state: 'ready',
+            ),
+          );
         }
       }
       if (mounted) {
@@ -155,25 +159,54 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final SettingsState settingsState = context.watch<SettingsCubit>().state;
-    final PrayerTimesState prayerState = context.watch<PrayerTimesCubit>().state;
+    final PrayerTimesState prayerState = context
+        .watch<PrayerTimesCubit>()
+        .state;
     final ProgressState progressState = context.watch<ProgressCubit>().state;
-    final bool dark = settingsState is SettingsLoaded ? settingsState.settings.darkMode : false;
-    final bool arabic = settingsState is SettingsLoaded ? settingsState.settings.arabicMode : false;
-    final bool hijriDates = settingsState is SettingsLoaded ? settingsState.settings.hijriDates : true;
-    final PrayerInfo? prayers = prayerState is PrayerTimesLoaded ? prayerState.prayerInfo : null;
-    final SuggestedSession? suggested = prayerState is PrayerTimesLoaded ? prayerState.suggestedSession : null;
-    final List<String> completedSessions = progressState is ProgressLoaded ? progressState.progress.completedSessionsToday : <String>[];
-    final int streak = progressState is ProgressLoaded ? progressState.progress.streak : 0;
-    final int points = progressState is ProgressLoaded ? progressState.progress.totalPoints : 0;
-    String t(String en, String arStr) => ar.localise(en, arStr, isArabic: arabic);
+    final bool dark = settingsState is SettingsLoaded
+        ? settingsState.settings.darkMode
+        : false;
+    final bool arabic = settingsState is SettingsLoaded
+        ? settingsState.settings.arabicMode
+        : false;
+    final bool hijriDates = settingsState is SettingsLoaded
+        ? settingsState.settings.hijriDates
+        : true;
+    final PrayerInfo? prayers = prayerState is PrayerTimesLoaded
+        ? prayerState.prayerInfo
+        : null;
+    final SuggestedSession? suggested = prayerState is PrayerTimesLoaded
+        ? prayerState.suggestedSession
+        : null;
+    final List<String> completedSessions = progressState is ProgressLoaded
+        ? progressState.progress.completedSessionsToday
+        : <String>[];
+    final int streak = progressState is ProgressLoaded
+        ? progressState.progress.streak
+        : 0;
+    final int points = progressState is ProgressLoaded
+        ? progressState.progress.totalPoints
+        : 0;
+    String t(String en, String arStr) =>
+        ar.localise(en, arStr, isArabic: arabic);
     final Color bg = dark ? AppColors.bgDark : AppColors.bgLight;
-    final Color textPrimary = dark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-    final Color secondary = dark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
-    final Color teal = dark ? AppColors.accentTealDark : AppColors.accentTealLight;
-    final Color gold = dark ? AppColors.accentGoldDark : AppColors.accentGoldLight;
+    final Color textPrimary = dark
+        ? AppColors.textPrimaryDark
+        : AppColors.textPrimaryLight;
+    final Color secondary = dark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
+    final Color teal = dark
+        ? AppColors.accentTealDark
+        : AppColors.accentTealLight;
+    final Color gold = dark
+        ? AppColors.accentGoldDark
+        : AppColors.accentGoldLight;
     final Color cardBg = dark ? AppColors.cardBgDark : AppColors.cardBgLight;
     final Color border = dark ? AppColors.borderDark : AppColors.borderLight;
-    final Color progressBg = dark ? AppColors.progressBgDark : AppColors.progressBgLight;
+    final Color progressBg = dark
+        ? AppColors.progressBgDark
+        : AppColors.progressBgLight;
     return Directionality(
       textDirection: arabic ? ui.TextDirection.rtl : ui.TextDirection.ltr,
       child: Scaffold(
@@ -185,7 +218,20 @@ class _HomeScreenState extends State<HomeScreen> {
               bottom: false,
               child: Column(
                 children: [
-                  _buildHeader(context, dark, arabic, hijriDates, t, gold, secondary, cardBg, border, teal, streak, points),
+                  _buildHeader(
+                    context,
+                    dark,
+                    arabic,
+                    hijriDates,
+                    t,
+                    gold,
+                    secondary,
+                    cardBg,
+                    border,
+                    teal,
+                    streak,
+                    points,
+                  ),
                   Expanded(
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
@@ -197,14 +243,38 @@ class _HomeScreenState extends State<HomeScreen> {
                           _buildSessionsHeader(arabic, t, teal, gold),
                           const SizedBox(height: 12),
                           if (_isLoading)
-                            const Center(child: Padding(
-                              padding: EdgeInsets.all(20.0),
-                              child: CircularProgressIndicator(),
-                            ))
+                            const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(20.0),
+                                child: CircularProgressIndicator(),
+                              ),
+                            )
                           else
-                            _buildSessionCards(dark, arabic, t, teal, gold, cardBg, border, progressBg, secondary, textPrimary, context, suggested, completedSessions, prayers),
+                            _buildSessionCards(
+                              dark,
+                              arabic,
+                              t,
+                              teal,
+                              gold,
+                              cardBg,
+                              border,
+                              progressBg,
+                              secondary,
+                              textPrimary,
+                              context,
+                              suggested,
+                              completedSessions,
+                              prayers,
+                            ),
                           const SizedBox(height: 16),
-                          _buildVerseCard(dark, arabic, t, gold, secondary, textPrimary),
+                          _buildVerseCard(
+                            dark,
+                            arabic,
+                            t,
+                            gold,
+                            secondary,
+                            textPrimary,
+                          ),
                         ],
                       ),
                     ),
@@ -236,15 +306,39 @@ class _HomeScreenState extends State<HomeScreen> {
     final HijriCalendar hijriNow = HijriCalendar.now();
     HijriCalendar.setLocal('en');
     final String gregorianEn = DateFormat('EEEE, d MMMM', 'en_US').format(now);
-    final String hijriEn = '${hijriNow.hDay} ${hijriNow.getLongMonthName()} ${hijriNow.hYear}';
+    final String hijriEn =
+        '${hijriNow.hDay} ${hijriNow.getLongMonthName()} ${hijriNow.hYear}';
     final String dateStrEn = showHijri ? hijriEn : gregorianEn;
-    final List<String> arDays = <String>['الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'];
-    final List<String> arMonths = <String>['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+    final List<String> arDays = <String>[
+      'الإثنين',
+      'الثلاثاء',
+      'الأربعاء',
+      'الخميس',
+      'الجمعة',
+      'السبت',
+      'الأحد',
+    ];
+    final List<String> arMonths = <String>[
+      'يناير',
+      'فبراير',
+      'مارس',
+      'أبريل',
+      'مايو',
+      'يونيو',
+      'يوليو',
+      'أغسطس',
+      'سبتمبر',
+      'أكتوبر',
+      'نوفمبر',
+      'ديسمبر',
+    ];
     final String dayName = arDays[now.weekday - 1];
     final String monthName = arMonths[now.month - 1];
-    final String gregorianAr = '$dayName ${ar.toArabicDigits(now.day.toString(), isArabic: true)} $monthName';
+    final String gregorianAr =
+        '$dayName ${ar.toArabicDigits(now.day.toString(), isArabic: true)} $monthName';
     HijriCalendar.setLocal('ar');
-    final String hijriAr = '${ar.toArabicDigits(hijriNow.hDay.toString(), isArabic: true)} ${hijriNow.getLongMonthName()} ${ar.toArabicDigits(hijriNow.hYear.toString(), isArabic: true)}';
+    final String hijriAr =
+        '${ar.toArabicDigits(hijriNow.hDay.toString(), isArabic: true)} ${hijriNow.getLongMonthName()} ${ar.toArabicDigits(hijriNow.hYear.toString(), isArabic: true)}';
     final String dateStrAr = showHijri ? hijriAr : gregorianAr;
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 52, 24, 12),
@@ -280,10 +374,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 else
                   Text(
                     dateStrAr,
-                    style: GoogleFonts.amiri(
-                      fontSize: 18,
-                      color: secondary,
-                    ),
+                    style: GoogleFonts.amiri(fontSize: 18, color: secondary),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -306,7 +397,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 8),
                 _StatPill(
                   icon: Icons.diamond_outlined,
-                  value: ar.toArabicDigits(ar.formatNumber(points), isArabic: arabic),
+                  value: ar.toArabicDigits(
+                    ar.formatNumber(points),
+                    isArabic: arabic,
+                  ),
                   color: teal,
                   cardBg: cardBg,
                   border: border,
@@ -325,7 +419,9 @@ class _HomeScreenState extends State<HomeScreen> {
     String Function(String, String) t,
     PrayerInfo? prayers,
   ) {
-    final List<Color> gradientColors = dark ? AppColors.prayerCardDark : AppColors.prayerCardLight;
+    final List<Color> gradientColors = dark
+        ? AppColors.prayerCardDark
+        : AppColors.prayerCardLight;
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
@@ -401,7 +497,11 @@ class _HomeScreenState extends State<HomeScreen> {
     PrayerInfo? prayers,
   ) {
     final List<_Session> visibleSessions = _dailySessions.where((_Session s) {
-      final String state = _determineState(s.jsonId, prayers, completedSessions);
+      final String state = _determineState(
+        s.jsonId,
+        prayers,
+        completedSessions,
+      );
       return state != 'hidden';
     }).toList();
     visibleSessions.sort((_Session a, _Session b) {
@@ -411,7 +511,11 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     return Column(
       children: visibleSessions.map((_Session s) {
-        final String dynamicState = _determineState(s.jsonId, prayers, completedSessions);
+        final String dynamicState = _determineState(
+          s.jsonId,
+          prayers,
+          completedSessions,
+        );
         return Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: _SessionCard(
@@ -429,7 +533,9 @@ class _HomeScreenState extends State<HomeScreen> {
             isSuggested: dynamicState == 'active',
             onTap: () {
               Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (BuildContext _) => ZikrScreen(sessionId: s.jsonId)),
+                MaterialPageRoute<void>(
+                  builder: (BuildContext _) => ZikrScreen(sessionId: s.jsonId),
+                ),
               );
             },
           ),
@@ -440,13 +546,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   int _priority(String jsonId, PrayerInfo? prayers) {
     final DateTime now = DateTime.now();
-    final bool postPrayerActive = prayers != null && (
-      _isWithinHourAfter(now, prayers.fajr) ||
-      _isWithinHourAfter(now, prayers.dhuhr) ||
-      _isWithinHourAfter(now, prayers.asr) ||
-      _isWithinHourAfter(now, prayers.maghrib) ||
-      _isWithinHourAfter(now, prayers.isha)
-    );
+    final bool postPrayerActive =
+        prayers != null &&
+        (_isWithinHourAfter(now, prayers.fajr) ||
+            _isWithinHourAfter(now, prayers.dhuhr) ||
+            _isWithinHourAfter(now, prayers.asr) ||
+            _isWithinHourAfter(now, prayers.maghrib) ||
+            _isWithinHourAfter(now, prayers.isha));
     final bool afterIsha = prayers != null && now.isAfter(prayers.isha);
     switch (jsonId) {
       case 'cat_7':
@@ -464,7 +570,11 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  String _determineState(String jsonId, PrayerInfo? prayers, List<String> completedSessions) {
+  String _determineState(
+    String jsonId,
+    PrayerInfo? prayers,
+    List<String> completedSessions,
+  ) {
     if (prayers == null) {
       return 'active';
     }
@@ -511,7 +621,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   bool _isWithinHourAfter(DateTime now, DateTime prayerTime) =>
-      now.isAfter(prayerTime) && now.isBefore(prayerTime.add(const Duration(hours: 1)));
+      now.isAfter(prayerTime) &&
+      now.isBefore(prayerTime.add(const Duration(hours: 1)));
 
   Widget _buildVerseCard(
     bool dark,
@@ -579,10 +690,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
-          const SizedBox(width: 8),
           Transform.scale(
             scaleX: arabic ? -1.0 : 1.0,
-            child: Icon(Icons.chevron_right, size: 16, color: secondary),
+            child: Icon(
+              Icons.chevron_right,
+              size: 16,
+              color: secondary,
+              textDirection: ui.TextDirection.ltr,
+            ),
           ),
         ],
       ),
@@ -672,20 +787,20 @@ class _SessionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isActive = dynamicState == 'active';
-    final bool isReady  = dynamicState == 'ready';
+    final bool isReady = dynamicState == 'ready';
     final bool isLocked = dynamicState == 'locked';
     final Border cardBorder = isSuggested
         ? Border.all(color: teal, width: 1.5)
         : isActive
-            ? Border.all(color: teal, width: 1)
-            : isReady
-                ? Border.all(color: gold.withValues(alpha: 0.4), width: 1)
-                : Border.all(color: border, width: 1);
+        ? Border.all(color: teal, width: 1)
+        : isReady
+        ? Border.all(color: gold.withValues(alpha: 0.4), width: 1)
+        : Border.all(color: border, width: 1);
     final Color iconBg = isLocked
         ? progressBg
         : isActive
-            ? (dark ? const Color(0x264DB6AC) : const Color(0x140B6E6E))
-            : (dark ? const Color(0x1FD4A84B) : const Color(0x14B8973A));
+        ? (dark ? const Color(0x264DB6AC) : const Color(0x140B6E6E))
+        : (dark ? const Color(0x1FD4A84B) : const Color(0x14B8973A));
     return GestureDetector(
       onTap: onTap,
       child: AnimatedOpacity(
@@ -724,10 +839,9 @@ class _SessionCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Expanded(
+                        Flexible(
                           child: Text(
                             arabic ? session.nameAr : session.nameEn,
                             style: arabic
@@ -746,12 +860,18 @@ class _SessionCard extends StatelessWidget {
                         ),
                         if (isSuggested)
                           Container(
-                            margin: const EdgeInsets.only(left: 8, top: 1),
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            margin: const EdgeInsetsDirectional.only(start: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
                             decoration: BoxDecoration(
                               color: teal.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(9999),
-                              border: Border.all(color: teal.withValues(alpha: 0.4), width: 1),
+                              border: Border.all(
+                                color: teal.withValues(alpha: 0.4),
+                                width: 1,
+                              ),
                             ),
                             child: Text(
                               arabic ? 'الآن' : 'Now',
@@ -769,24 +889,41 @@ class _SessionCard extends StatelessWidget {
                     Builder(
                       builder: (BuildContext context) {
                         if (dynamicState == 'done') {
-                          final List<({String en, String ar})> phrases = <({String en, String ar})>[
-                            (en: "May Allah Accept", ar: "تقبل الله"),
-                            (en: "Alhamdulillah", ar: "الحمد لله"),
-                            (en: "Reward Written Inshallah", ar: "كُتب الأجر إن شاء الله"),
-                          ];
-                          final int idx = session.jsonId.hashCode % phrases.length;
+                          final List<({String en, String ar})> phrases =
+                              <({String en, String ar})>[
+                                (en: "May Allah Accept", ar: "تقبل الله"),
+                                (en: "Alhamdulillah", ar: "الحمد لله"),
+                                (
+                                  en: "Reward Written Inshallah",
+                                  ar: "كُتب الأجر إن شاء الله",
+                                ),
+                              ];
+                          final int idx =
+                              session.jsonId.hashCode % phrases.length;
                           final ({String en, String ar}) p = phrases[idx];
                           return Text(
                             arabic ? p.ar : p.en,
                             style: arabic
-                                ? GoogleFonts.amiri(fontSize: 14, color: gold, fontWeight: FontWeight.bold)
-                                : TextStyle(fontSize: 14, color: gold, fontWeight: FontWeight.bold),
+                                ? GoogleFonts.amiri(
+                                    fontSize: 14,
+                                    color: gold,
+                                    fontWeight: FontWeight.bold,
+                                  )
+                                : TextStyle(
+                                    fontSize: 14,
+                                    color: gold,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                           );
                         }
                         return Text(
                           arabic ? session.descAr : session.descEn,
                           style: arabic
-                              ? GoogleFonts.amiri(fontSize: 14, color: secondary, height: 1.4)
+                              ? GoogleFonts.amiri(
+                                  fontSize: 14,
+                                  color: secondary,
+                                  height: 1.4,
+                                )
                               : TextStyle(fontSize: 14, color: secondary),
                         );
                       },
@@ -803,7 +940,9 @@ class _SessionCard extends StatelessWidget {
                             alignment: Alignment.centerLeft,
                             child: Container(
                               decoration: BoxDecoration(
-                                gradient: LinearGradient(colors: <Color>[teal, gold]),
+                                gradient: LinearGradient(
+                                  colors: <Color>[teal, gold],
+                                ),
                                 borderRadius: BorderRadius.circular(9999),
                               ),
                             ),
@@ -817,7 +956,10 @@ class _SessionCard extends StatelessWidget {
               if (!isLocked) ...[
                 const SizedBox(width: 14),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 7,
+                  ),
                   decoration: BoxDecoration(
                     color: isActive ? teal : gold,
                     borderRadius: BorderRadius.circular(9999),
@@ -859,10 +1001,10 @@ class _StarIconPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
     final Path path = Path()
       ..moveTo(12 * s, 2 * s)
-      ..lineTo(9 * s,  9 * s)
-      ..lineTo(2 * s,  9 * s)
-      ..lineTo(8 * s,  14 * s)
-      ..lineTo(6 * s,  21 * s)
+      ..lineTo(9 * s, 9 * s)
+      ..lineTo(2 * s, 9 * s)
+      ..lineTo(8 * s, 14 * s)
+      ..lineTo(6 * s, 21 * s)
       ..lineTo(12 * s, 17 * s)
       ..lineTo(18 * s, 21 * s)
       ..lineTo(16 * s, 14 * s)
@@ -892,10 +1034,22 @@ class _CardStarPainter extends CustomPainter {
         canvas.save();
         canvas.translate(x, y);
         final Path path = Path()
-          ..moveTo(20, 4)  ..lineTo(22, 14) ..lineTo(32, 12) ..lineTo(25, 19)
-          ..lineTo(32, 22) ..lineTo(25, 25) ..lineTo(32, 32) ..lineTo(22, 30)
-          ..lineTo(20, 40) ..lineTo(18, 30) ..lineTo(8,  32) ..lineTo(15, 25)
-          ..lineTo(8,  22) ..lineTo(15, 19) ..lineTo(8,  12) ..lineTo(18, 14)
+          ..moveTo(20, 4)
+          ..lineTo(22, 14)
+          ..lineTo(32, 12)
+          ..lineTo(25, 19)
+          ..lineTo(32, 22)
+          ..lineTo(25, 25)
+          ..lineTo(32, 32)
+          ..lineTo(22, 30)
+          ..lineTo(20, 40)
+          ..lineTo(18, 30)
+          ..lineTo(8, 32)
+          ..lineTo(15, 25)
+          ..lineTo(8, 22)
+          ..lineTo(15, 19)
+          ..lineTo(8, 12)
+          ..lineTo(18, 14)
           ..close();
         canvas.drawPath(path, paint);
         canvas.restore();
@@ -952,19 +1106,22 @@ class _PrayerCardContentState extends State<_PrayerCardContent> {
     }
     final DateTime now = DateTime.now();
     final DateFormat fmt = DateFormat('h:mm a');
-    final List<({String nameAr, String nameEn, DateTime dt})> list = <({String nameAr, String nameEn, DateTime dt})>[
-      (nameAr: 'الفجر', nameEn: 'Fajr', dt: widget.prayers!.fajr),
-      (nameAr: 'الظهر', nameEn: 'Dhuhr', dt: widget.prayers!.dhuhr),
-      (nameAr: 'العصر', nameEn: 'Asr', dt: widget.prayers!.asr),
-      (nameAr: 'المغرب', nameEn: 'Maghrib', dt: widget.prayers!.maghrib),
-      (nameAr: 'العشاء', nameEn: 'Isha', dt: widget.prayers!.isha),
-    ];
+    final List<({String nameAr, String nameEn, DateTime dt})> list =
+        <({String nameAr, String nameEn, DateTime dt})>[
+          (nameAr: 'الفجر', nameEn: 'Fajr', dt: widget.prayers!.fajr),
+          (nameAr: 'الظهر', nameEn: 'Dhuhr', dt: widget.prayers!.dhuhr),
+          (nameAr: 'العصر', nameEn: 'Asr', dt: widget.prayers!.asr),
+          (nameAr: 'المغرب', nameEn: 'Maghrib', dt: widget.prayers!.maghrib),
+          (nameAr: 'العشاء', nameEn: 'Isha', dt: widget.prayers!.isha),
+        ];
     for (final ({String nameAr, String nameEn, DateTime dt}) p in list) {
       if (p.dt.isAfter(now)) {
         return (nameAr: p.nameAr, nameEn: p.nameEn, time: fmt.format(p.dt));
       }
     }
-    final DateTime tomorrowFajr = widget.prayers!.fajr.add(const Duration(days: 1));
+    final DateTime tomorrowFajr = widget.prayers!.fajr.add(
+      const Duration(days: 1),
+    );
     return (nameAr: 'الفجر', nameEn: 'Fajr', time: fmt.format(tomorrowFajr));
   }
 
@@ -978,43 +1135,56 @@ class _PrayerCardContentState extends State<_PrayerCardContent> {
       widget.prayers!.dhuhr,
       widget.prayers!.asr,
       widget.prayers!.maghrib,
-      widget.prayers!.isha
+      widget.prayers!.isha,
     ];
     for (final DateTime dt in list) {
       if (dt.isAfter(now)) {
         final Duration diff = dt.difference(now);
         final int h = diff.inHours;
         final int m = diff.inMinutes % 60;
-        return h > 0 ? '$h:${m.toString().padLeft(2, '0')}' : '0:${m.toString().padLeft(2, '0')}';
+        return h > 0
+            ? '$h:${m.toString().padLeft(2, '0')}'
+            : '0:${m.toString().padLeft(2, '0')}';
       }
     }
-    final DateTime tomorrowFajr = widget.prayers!.fajr.add(const Duration(days: 1));
+    final DateTime tomorrowFajr = widget.prayers!.fajr.add(
+      const Duration(days: 1),
+    );
     final Duration diff = tomorrowFajr.difference(now);
     final int h = diff.inHours;
     final int m = diff.inMinutes % 60;
-    return h > 0 ? '$h:${m.toString().padLeft(2, '0')}' : '0:${m.toString().padLeft(2, '0')}';
+    return h > 0
+        ? '$h:${m.toString().padLeft(2, '0')}'
+        : '0:${m.toString().padLeft(2, '0')}';
   }
 
-  List<({String nameAr, String nameEn, String time, String status})> _prayerDots() {
+  List<({String nameAr, String nameEn, String time, String status})>
+  _prayerDots() {
     if (widget.prayers == null) {
       return <({String nameAr, String nameEn, String time, String status})>[
         (nameAr: 'الفجر', nameEn: 'Fajr', time: '--:--', status: 'upcoming'),
         (nameAr: 'الظهر', nameEn: 'Dhuhr', time: '--:--', status: 'next'),
         (nameAr: 'العصر', nameEn: 'Asr', time: '--:--', status: 'upcoming'),
-        (nameAr: 'المغرب', nameEn: 'Maghrib', time: '--:--', status: 'upcoming'),
+        (
+          nameAr: 'المغرب',
+          nameEn: 'Maghrib',
+          time: '--:--',
+          status: 'upcoming',
+        ),
         (nameAr: 'العشاء', nameEn: 'Isha', time: '--:--', status: 'upcoming'),
       ];
     }
     final DateTime now = DateTime.now();
     final DateFormat fmt = DateFormat('h:mm');
     bool nextFound = false;
-    final List<({String nameAr, String nameEn, DateTime dt})> raw = <({String nameAr, String nameEn, DateTime dt})>[
-      (nameAr: 'الفجر', nameEn: 'Fajr', dt: widget.prayers!.fajr),
-      (nameAr: 'الظهر', nameEn: 'Dhuhr', dt: widget.prayers!.dhuhr),
-      (nameAr: 'العصر', nameEn: 'Asr', dt: widget.prayers!.asr),
-      (nameAr: 'المغرب', nameEn: 'Maghrib', dt: widget.prayers!.maghrib),
-      (nameAr: 'العشاء', nameEn: 'Isha', dt: widget.prayers!.isha),
-    ];
+    final List<({String nameAr, String nameEn, DateTime dt})> raw =
+        <({String nameAr, String nameEn, DateTime dt})>[
+          (nameAr: 'الفجر', nameEn: 'Fajr', dt: widget.prayers!.fajr),
+          (nameAr: 'الظهر', nameEn: 'Dhuhr', dt: widget.prayers!.dhuhr),
+          (nameAr: 'العصر', nameEn: 'Asr', dt: widget.prayers!.asr),
+          (nameAr: 'المغرب', nameEn: 'Maghrib', dt: widget.prayers!.maghrib),
+          (nameAr: 'العشاء', nameEn: 'Isha', dt: widget.prayers!.isha),
+        ];
     return raw.map((({String nameAr, String nameEn, DateTime dt}) p) {
       String status;
       if (p.dt.isBefore(now)) {
@@ -1025,7 +1195,12 @@ class _PrayerCardContentState extends State<_PrayerCardContent> {
       } else {
         status = 'upcoming';
       }
-      return (nameAr: p.nameAr, nameEn: p.nameEn, time: fmt.format(p.dt), status: status);
+      return (
+        nameAr: p.nameAr,
+        nameEn: p.nameEn,
+        time: fmt.format(p.dt),
+        status: status,
+      );
     }).toList();
   }
 
@@ -1033,8 +1208,30 @@ class _PrayerCardContentState extends State<_PrayerCardContent> {
     if (!widget.arabic) {
       return num;
     }
-    const List<String> english = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-    const List<String> arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+    const List<String> english = [
+      '0',
+      '1',
+      '2',
+      '3',
+      '4',
+      '5',
+      '6',
+      '7',
+      '8',
+      '9',
+    ];
+    const List<String> arabic = [
+      '٠',
+      '١',
+      '٢',
+      '٣',
+      '٤',
+      '٥',
+      '٦',
+      '٧',
+      '٨',
+      '٩',
+    ];
     String res = num;
     for (int i = 0; i < english.length; i++) {
       res = res.replaceAll(english[i], arabic[i]);
@@ -1046,7 +1243,8 @@ class _PrayerCardContentState extends State<_PrayerCardContent> {
   Widget build(BuildContext context) {
     final ({String nameAr, String nameEn, String time}) next = _nextPrayer();
     final String countdown = _toArabic(_countdown());
-    final List<({String nameAr, String nameEn, String status, String time})> dots = _prayerDots();
+    final List<({String nameAr, String nameEn, String status, String time})>
+    dots = _prayerDots();
     return Column(
       children: [
         Row(
@@ -1086,7 +1284,9 @@ class _PrayerCardContentState extends State<_PrayerCardContent> {
               ],
             ),
             Column(
-              crossAxisAlignment: widget.arabic ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+              crossAxisAlignment: widget.arabic
+                  ? CrossAxisAlignment.start
+                  : CrossAxisAlignment.end,
               children: [
                 Text(
                   widget.t('in', 'خلال').toUpperCase(),
@@ -1109,18 +1309,32 @@ class _PrayerCardContentState extends State<_PrayerCardContent> {
                 ),
                 Text(
                   widget.t('h · min', 'ساعة · دقيقة'),
-                  style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.5)),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white.withValues(alpha: 0.5),
+                  ),
                 ),
               ],
             ),
           ],
         ),
         const SizedBox(height: 10),
-        Divider(color: Colors.white.withValues(alpha: 0.1), height: 1, thickness: 1),
+        Divider(
+          color: Colors.white.withValues(alpha: 0.1),
+          height: 1,
+          thickness: 1,
+        ),
         const SizedBox(height: 14),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: dots.map((({String nameAr, String nameEn, String status, String time}) p) => _LivePrayerDot(prayer: p, arabic: widget.arabic)).toList(),
+          children: dots
+              .map(
+                (
+                  ({String nameAr, String nameEn, String status, String time})
+                  p,
+                ) => _LivePrayerDot(prayer: p, arabic: widget.arabic),
+              )
+              .toList(),
         ),
       ],
     );
@@ -1131,10 +1345,7 @@ class _LivePrayerDot extends StatelessWidget {
   final ({String nameAr, String nameEn, String status, String time}) prayer;
   final bool arabic;
 
-  const _LivePrayerDot({
-    required this.prayer,
-    required this.arabic,
-  });
+  const _LivePrayerDot({required this.prayer, required this.arabic});
 
   @override
   Widget build(BuildContext context) {
@@ -1144,18 +1355,18 @@ class _LivePrayerDot extends StatelessWidget {
     final Color dotColor = isDone
         ? const Color(0x664DB6AC)
         : isNext
-            ? AppColors.prayerCardGold
-            : Colors.white.withValues(alpha: 0.1);
+        ? AppColors.prayerCardGold
+        : Colors.white.withValues(alpha: 0.1);
     final Border? dotBorder = isDone
         ? Border.all(color: const Color(0xB34DB6AC), width: 1.5)
         : isNext
-            ? null
-            : Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1.5);
+        ? null
+        : Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1.5);
     final Color nameColor = isNext
         ? AppColors.prayerCardGold
         : isDone
-            ? const Color(0xB3C8F5F0)
-            : Colors.white.withValues(alpha: 0.4);
+        ? const Color(0xB3C8F5F0)
+        : Colors.white.withValues(alpha: 0.4);
     return Expanded(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1172,15 +1383,15 @@ class _LivePrayerDot extends StatelessWidget {
               child: isDone
                   ? const Icon(Icons.check, size: 11, color: Color(0xE6C8FFF5))
                   : isNext
-                      ? Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Color(0xFF0B5050),
-                          ),
-                        )
-                      : const SizedBox.shrink(),
+                  ? Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFF0B5050),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
             ),
           ),
           const SizedBox(height: 5),

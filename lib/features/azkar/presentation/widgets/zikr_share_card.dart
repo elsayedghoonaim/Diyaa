@@ -111,7 +111,8 @@ class ZikrShareCard extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          padding: const EdgeInsets.all(6),
+          width: 32,
+          height: 32,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(
@@ -119,10 +120,17 @@ class ZikrShareCard extends StatelessWidget {
               width: 1,
             ),
           ),
-          child: Icon(
-            Icons.auto_awesome,
-            size: 16,
-            color: goldColor,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Image.asset(
+              isDark ? 'assets/icon_dark.png' : 'assets/icon_light.png',
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Icon(
+                Icons.auto_awesome,
+                size: 16,
+                color: goldColor,
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 8),

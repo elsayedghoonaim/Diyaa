@@ -26,138 +26,149 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final Color teal = dark ? AppColors.accentTealDark : AppColors.accentTealLight;
     final Color gold = dark ? AppColors.accentGoldDark : AppColors.accentGoldLight;
 
-    return Scaffold(
-      backgroundColor: bg,
-      body: Stack(
-        children: <Widget>[
-          const IslamicPatternOverlay(),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 30),
-              child: Column(
-                children: <Widget>[
-                  const Spacer(),
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: gold.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: gold.withValues(alpha: 0.3), width: 2),
+    return Directionality(
+      textDirection: arabic ? TextDirection.rtl : TextDirection.ltr,
+      child: Scaffold(
+        backgroundColor: bg,
+        body: Stack(
+          children: <Widget>[
+            const IslamicPatternOverlay(),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 30),
+                child: Column(
+                  crossAxisAlignment: arabic
+                      ? CrossAxisAlignment.end
+                      : CrossAxisAlignment.center,
+                  children: <Widget>[
+                    const Spacer(),
+                    Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        color: gold.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: gold.withValues(alpha: 0.3),
+                          width: 2,
+                        ),
+                      ),
+                      child: Icon(Icons.auto_awesome, size: 50, color: gold),
                     ),
-                    child: Icon(Icons.auto_awesome, size: 50, color: gold),
-                  ),
-                  const SizedBox(height: 30),
-                  Text(
-                    arabic ? 'مرحباً بك في ضياء' : 'Welcome to Diyaa',
-                    style: GoogleFonts.amiri(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: gold,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    arabic
-                        ? 'اختر لغتك ونظام الألوان المفضل'
-                        : 'Choose your language and theme',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 50),
-
-                  _buildOptionTitle(arabic ? 'اللغة' : 'Language', gold),
-                  const SizedBox(height: 15),
-                  Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: _ChoiceCard(
-                          label: 'English',
-                          selected: !arabic,
-                          onTap: () => cubit.setArabicMode(false),
-                          teal: teal,
-                          dark: dark,
-                        ),
-                      ),
-                      const SizedBox(width: 15),
-                      Expanded(
-                        child: _ChoiceCard(
-                          label: 'العربية',
-                          selected: arabic,
-                          onTap: () => cubit.setArabicMode(true),
-                          teal: teal,
-                          dark: dark,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 40),
-
-                  _buildOptionTitle(arabic ? 'المظهر' : 'Theme', gold),
-                  const SizedBox(height: 15),
-                  Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: _ChoiceCard(
-                          label: arabic ? 'فاتح' : 'Light',
-                          selected: !dark,
-                          onTap: () => cubit.setDarkMode(false),
-                          teal: teal,
-                          dark: dark,
-                        ),
-                      ),
-                      const SizedBox(width: 15),
-                      Expanded(
-                        child: _ChoiceCard(
-                          label: arabic ? 'داكن' : 'Dark',
-                          selected: dark,
-                          onTap: () => cubit.setDarkMode(true),
-                          teal: teal,
-                          dark: dark,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const Spacer(),
-
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: () => cubit.completeOnboarding(),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: gold,
-                        foregroundColor: const Color(0xFF1A1A2E),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: Text(
-                        arabic ? 'ابدأ الآن' : 'Get Started',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    const SizedBox(height: 30),
+                    Text(
+                      arabic ? 'مرحباً بك في ضياء' : 'Welcome to Diyaa',
+                      textAlign: arabic ? TextAlign.right : TextAlign.center,
+                      style: GoogleFonts.amiri(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: gold,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 40),
-                ],
+                    const SizedBox(height: 10),
+                    Text(
+                      arabic
+                          ? 'اختر لغتك ونظام الألوان المفضل'
+                          : 'Choose your language and theme',
+                      textAlign: arabic ? TextAlign.right : TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 50),
+
+                    _buildOptionTitle(arabic ? 'اللغة' : 'Language', gold, arabic),
+                    const SizedBox(height: 15),
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: _ChoiceCard(
+                            label: 'English',
+                            selected: !arabic,
+                            onTap: () => cubit.setArabicMode(false),
+                            teal: teal,
+                            dark: dark,
+                          ),
+                        ),
+                        const SizedBox(width: 15),
+                        Expanded(
+                          child: _ChoiceCard(
+                            label: 'العربية',
+                            selected: arabic,
+                            onTap: () => cubit.setArabicMode(true),
+                            teal: teal,
+                            dark: dark,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 40),
+
+                    _buildOptionTitle(arabic ? 'المظهر' : 'Theme', gold, arabic),
+                    const SizedBox(height: 15),
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: _ChoiceCard(
+                            label: arabic ? 'فاتح' : 'Light',
+                            selected: !dark,
+                            onTap: () => cubit.setDarkMode(false),
+                            teal: teal,
+                            dark: dark,
+                          ),
+                        ),
+                        const SizedBox(width: 15),
+                        Expanded(
+                          child: _ChoiceCard(
+                            label: arabic ? 'داكن' : 'Dark',
+                            selected: dark,
+                            onTap: () => cubit.setDarkMode(true),
+                            teal: teal,
+                            dark: dark,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const Spacer(),
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed: () => cubit.completeOnboarding(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: gold,
+                          foregroundColor: const Color(0xFF1A1A2E),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: Text(
+                          arabic ? 'ابدأ الآن' : 'Get Started',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildOptionTitle(String title, Color color) {
+  Widget _buildOptionTitle(String title, Color color, bool arabic) {
     return Row(
+      mainAxisAlignment: arabic ? MainAxisAlignment.end : MainAxisAlignment.start,
       children: <Widget>[
         Container(
           width: 4,

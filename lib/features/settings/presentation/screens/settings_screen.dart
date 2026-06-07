@@ -26,7 +26,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-
   @override
   Widget build(BuildContext context) {
     final settingsState = context.watch<SettingsCubit>().state;
@@ -40,21 +39,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
     }
     if (settingsState is! SettingsLoaded) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     final settings = settingsState.settings;
-    final cubit    = context.read<SettingsCubit>();
-    final dark     = settings.darkMode;
-    final arabic   = settings.arabicMode;
+    final cubit = context.read<SettingsCubit>();
+    final dark = settings.darkMode;
+    final arabic = settings.arabicMode;
     final hijriDates = settings.hijriDates;
-    String t(String en, String arStr) => ar.localise(en, arStr, isArabic: arabic);
+    String t(String en, String arStr) =>
+        ar.localise(en, arStr, isArabic: arabic);
 
     final bg = dark ? AppColors.bgDark : AppColors.bgLight;
-    final textSecondary = dark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final textSecondary = dark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
     final teal = dark ? AppColors.accentTealDark : AppColors.accentTealLight;
     final gold = dark ? AppColors.accentGoldDark : AppColors.accentGoldLight;
 
@@ -83,7 +81,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         SizedBox(
                           width: 36,
                           child: Align(
-                            alignment: arabic ? Alignment.centerRight : Alignment.centerLeft,
+                            alignment: arabic
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
                             child: const SizedBox.shrink(),
                           ),
                         ),
@@ -125,48 +125,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ar: 'اللغة',
                             children: [
                               SettingRow(
-                                icon: Icons.translate,
+                                icon: Text(
+                                  arabic ? 'EN' : 'ع',
+                                  style: arabic
+                                      ? TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w800,
+                                          color: gold,
+                                        )
+                                      : GoogleFonts.amiri(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: gold,
+                                          height: 1.1,
+                                        ),
+                                ),
                                 iconColor: gold,
                                 iconBgMode: 'gold',
                                 label: 'Full Arabic Mode',
                                 arLabel: 'الوضع العربي الكامل',
-                                sublabel: t('Switch entire UI to Arabic', 'تحويل كامل واجهة التطبيق إلى العربية'),
-                                rightWidget: _Toggle(on: arabic, onToggle: () => cubit.setArabicMode(!arabic), teal: teal),
-                              ),
-                              if (arabic)
-                                Padding(
-                                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                    decoration: BoxDecoration(
-                                      color: dark ? const Color(0x14D4A84B) : const Color(0x11B8973A),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: dark ? const Color(0x33D4A84B) : const Color(0x33B8973A)),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                                      children: [
-                                        Text(
-                                          'تم تفعيل الوضع العربي الكامل',
-                                          textAlign: TextAlign.right,
-                                          style: GoogleFonts.amiri(
-                                            fontSize: 16,
-                                            color: gold,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          'جميع الشاشات تظهر الآن باللغة العربية',
-                                          textAlign: TextAlign.right,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: textSecondary,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                                sublabel: t(
+                                  'Switch entire UI to Arabic',
+                                  'تحويل كامل واجهة التطبيق إلى العربية',
                                 ),
+                                rightWidget: _Toggle(
+                                  on: arabic,
+                                  onToggle: () => cubit.setArabicMode(!arabic),
+                                  teal: teal,
+                                ),
+                                isLast: true,
+                              ),
                             ],
                           ),
 
@@ -178,15 +166,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               SettingRow(
                                 icon: Icons.near_me_outlined,
                                 iconColor: teal,
-                                iconBgMode: settings.useGps ? 'teal_active' : 'teal',
+                                iconBgMode: settings.useGps
+                                    ? 'teal_active'
+                                    : 'teal',
                                 label: 'Use GPS Location',
                                 arLabel: 'استخدام GPS',
                                 sublabel: settings.useGps
-                                    ? t('Automatic · Updates with your position', 'تلقائي · يتحدث حسب موقعك')
+                                    ? t(
+                                        'Automatic · Updates with your position',
+                                        'تلقائي · يتحدث حسب موقعك',
+                                      )
                                     : t('Tap to enable GPS', 'اضغط لتفعيل GPS'),
                                 rightWidget: _Toggle(
                                   on: settings.useGps,
-                                  onToggle: () => cubit.setUseGps(!settings.useGps),
+                                  onToggle: () =>
+                                      cubit.setUseGps(!settings.useGps),
                                   teal: teal,
                                 ),
                                 isLast: settings.useGps,
@@ -201,10 +195,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   arLabel: 'اختر المدينة',
                                   sublabel: settings.manualCityName.isNotEmpty
                                       ? settings.manualCityName
-                                      : t('Tap to select your city', 'اضغط لاختيار مدينتك'),
+                                      : t(
+                                          'Tap to select your city',
+                                          'اضغط لاختيار مدينتك',
+                                        ),
                                   rightWidget: Icon(
-                                    arabic ? Icons.chevron_left : Icons.chevron_right,
-                                    size: 16, color: textSecondary,
+                                    arabic
+                                        ? Icons.chevron_left
+                                        : Icons.chevron_right,
+                                    size: 16,
+                                    color: textSecondary,
                                   ),
                                   onTap: () => showModalBottomSheet(
                                     context: context,
@@ -217,29 +217,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                               if (settings.latitude != null)
                                 Padding(
-                                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
+                                  padding: const EdgeInsets.fromLTRB(
+                                    18,
+                                    0,
+                                    18,
+                                    14,
+                                  ),
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: dark ? const Color(0x144DB6AC) : const Color(0x0F0B6E6E),
+                                      color: dark
+                                          ? const Color(0x144DB6AC)
+                                          : const Color(0x0F0B6E6E),
                                       borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(color: dark ? const Color(0x334DB6AC) : const Color(0x260B6E6E)),
+                                      border: Border.all(
+                                        color: dark
+                                            ? const Color(0x334DB6AC)
+                                            : const Color(0x260B6E6E),
+                                      ),
                                     ),
                                     child: Row(
                                       children: [
-                                        Icon(Icons.location_on, size: 13, color: teal),
+                                        Icon(
+                                          Icons.location_on,
+                                          size: 13,
+                                          color: teal,
+                                        ),
                                         const SizedBox(width: 8),
                                         Expanded(
                                           child: Text(
                                             locationLabel,
-                                            style: TextStyle(fontSize: 12, color: teal, fontWeight: FontWeight.w500),
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: teal,
+                                              fontWeight: FontWeight.w500,
+                                            ),
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
                                 ),
-
                             ],
                           ),
 
@@ -249,12 +270,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ar: 'المظهر',
                             children: [
                               SettingRow(
-                                icon: dark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+                                icon: dark
+                                    ? Icons.dark_mode_outlined
+                                    : Icons.light_mode_outlined,
                                 iconColor: dark ? teal : gold,
                                 iconBgMode: dark ? 'teal' : 'gold',
                                 label: 'Dark Mode',
                                 arLabel: 'الوضع الداكن',
-                                rightWidget: _Toggle(on: dark, onToggle: () => cubit.setDarkMode(!dark), teal: teal),
+                                rightWidget: _Toggle(
+                                  on: dark,
+                                  onToggle: () => cubit.setDarkMode(!dark),
+                                  teal: teal,
+                                ),
                               ),
                               SettingRow(
                                 icon: Icons.calendar_month_outlined,
@@ -262,7 +289,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 iconBgMode: 'teal',
                                 label: 'Hijri Date Display',
                                 arLabel: 'عرض التاريخ الهجري',
-                                rightWidget: _Toggle(on: hijriDates, onToggle: () => cubit.setHijriDates(!hijriDates), teal: teal),
+                                rightWidget: _Toggle(
+                                  on: hijriDates,
+                                  onToggle: () =>
+                                      cubit.setHijriDates(!hijriDates),
+                                  teal: teal,
+                                ),
                                 isLast: true,
                               ),
                             ],
@@ -274,37 +306,69 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ar: 'حجم الخط',
                             children: [
                               Padding(
-                                padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
+                                padding: const EdgeInsets.fromLTRB(
+                                  18,
+                                  4,
+                                  18,
+                                  16,
+                                ),
                                 child: Column(
                                   children: [
                                     // Size labels row
                                     Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                      ),
                                       child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
                                         children: [
                                           Text(
                                             t('Small', 'صغير'),
                                             style: TextStyle(
                                               fontSize: 12,
-                                              fontWeight: settings.appTextScale <= 0.82 ? FontWeight.w700 : FontWeight.w400,
-                                              color: settings.appTextScale <= 0.82 ? gold : textSecondary,
+                                              fontWeight:
+                                                  settings.appTextScale <= 0.82
+                                                  ? FontWeight.w700
+                                                  : FontWeight.w400,
+                                              color:
+                                                  settings.appTextScale <= 0.82
+                                                  ? gold
+                                                  : textSecondary,
                                             ),
                                           ),
                                           Text(
                                             t('Medium', 'متوسط'),
                                             style: TextStyle(
                                               fontSize: 12,
-                                              fontWeight: (settings.appTextScale > 0.82 && settings.appTextScale < 1.02) ? FontWeight.w700 : FontWeight.w400,
-                                              color: (settings.appTextScale > 0.82 && settings.appTextScale < 1.02) ? gold : textSecondary,
+                                              fontWeight:
+                                                  (settings.appTextScale >
+                                                          0.82 &&
+                                                      settings.appTextScale <
+                                                          1.02)
+                                                  ? FontWeight.w700
+                                                  : FontWeight.w400,
+                                              color:
+                                                  (settings.appTextScale >
+                                                          0.82 &&
+                                                      settings.appTextScale <
+                                                          1.02)
+                                                  ? gold
+                                                  : textSecondary,
                                             ),
                                           ),
                                           Text(
                                             t('Large', 'كبير'),
                                             style: TextStyle(
                                               fontSize: 12,
-                                              fontWeight: settings.appTextScale >= 1.02 ? FontWeight.w700 : FontWeight.w400,
-                                              color: settings.appTextScale >= 1.02 ? gold : textSecondary,
+                                              fontWeight:
+                                                  settings.appTextScale >= 1.02
+                                                  ? FontWeight.w700
+                                                  : FontWeight.w400,
+                                              color:
+                                                  settings.appTextScale >= 1.02
+                                                  ? gold
+                                                  : textSecondary,
                                             ),
                                           ),
                                         ],
@@ -315,17 +379,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     SliderTheme(
                                       data: SliderTheme.of(context).copyWith(
                                         activeTrackColor: teal,
-                                        inactiveTrackColor: dark ? AppColors.progressBgDark : AppColors.progressBgLight,
+                                        inactiveTrackColor: dark
+                                            ? AppColors.progressBgDark
+                                            : AppColors.progressBgLight,
                                         thumbColor: gold,
-                                        overlayColor: gold.withValues(alpha: 0.12),
+                                        overlayColor: gold.withValues(
+                                          alpha: 0.12,
+                                        ),
                                         trackHeight: 3,
-                                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
-                                        overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                                        thumbShape: const RoundSliderThumbShape(
+                                          enabledThumbRadius: 7,
+                                        ),
+                                        overlayShape:
+                                            const RoundSliderOverlayShape(
+                                              overlayRadius: 16,
+                                            ),
                                       ),
                                       child: Slider(
                                         value: settings.appTextScale <= 0.82
                                             ? 0.0
-                                            : (settings.appTextScale >= 1.02 ? 2.0 : 1.0),
+                                            : (settings.appTextScale >= 1.02
+                                                  ? 2.0
+                                                  : 1.0),
                                         min: 0.0,
                                         max: 2.0,
                                         divisions: 2,
@@ -344,14 +419,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     // Preview text
                                     Container(
                                       width: double.infinity,
-                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 10,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: dark ? const Color(0x144DB6AC) : const Color(0x0F0B6E6E),
+                                        color: dark
+                                            ? const Color(0x144DB6AC)
+                                            : const Color(0x0F0B6E6E),
                                         borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(color: dark ? const Color(0x334DB6AC) : const Color(0x260B6E6E)),
+                                        border: Border.all(
+                                          color: dark
+                                              ? const Color(0x334DB6AC)
+                                              : const Color(0x260B6E6E),
+                                        ),
                                       ),
                                       child: Text(
-                                        t('Preview: This is how text will appear', 'معاينة: هكذا سيظهر النص في التطبيق'),
+                                        t(
+                                          'Preview: This is how text will appear',
+                                          'معاينة: هكذا سيظهر النص في التطبيق',
+                                        ),
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
                                           fontSize: 13,
@@ -377,7 +464,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 iconBgMode: 'teal',
                                 label: 'Prayer Time Reminders',
                                 arLabel: 'تذكيرات أوقات الصلاة',
-                                rightWidget: _Toggle(on: settings.notifPrayer, onToggle: () => cubit.setNotifPrayer(!settings.notifPrayer), teal: teal),
+                                rightWidget: _Toggle(
+                                  on: settings.notifPrayer,
+                                  onToggle: () => cubit.setNotifPrayer(
+                                    !settings.notifPrayer,
+                                  ),
+                                  teal: teal,
+                                ),
                               ),
                               SettingRow(
                                 icon: Icons.auto_awesome,
@@ -385,8 +478,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 iconBgMode: 'teal',
                                 label: 'Azkar Reminders',
                                 arLabel: 'تذكيرات الأذكار',
-                                sublabel: t('Morning, evening & post-prayer azkar', 'أذكار الصباح والمساء وما بعد الصلاة'),
-                                rightWidget: _Toggle(on: settings.notifAzkar, onToggle: () => cubit.setNotifAzkar(!settings.notifAzkar), teal: teal),
+                                sublabel: t(
+                                  'Morning, evening & post-prayer azkar',
+                                  'أذكار الصباح والمساء وما بعد الصلاة',
+                                ),
+                                rightWidget: _Toggle(
+                                  on: settings.notifAzkar,
+                                  onToggle: () =>
+                                      cubit.setNotifAzkar(!settings.notifAzkar),
+                                  teal: teal,
+                                ),
                               ),
                               SettingRow(
                                 icon: Icons.notifications_none_outlined,
@@ -397,10 +498,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 rightWidget: _Toggle(
                                   on: settings.notifStreak,
                                   onToggle: () {
-                                    final streak = context.read<ProgressCubit>().state is ProgressLoaded
-                                        ? (context.read<ProgressCubit>().state as ProgressLoaded).progress.streak
+                                    final streak =
+                                        context.read<ProgressCubit>().state
+                                            is ProgressLoaded
+                                        ? (context.read<ProgressCubit>().state
+                                                  as ProgressLoaded)
+                                              .progress
+                                              .streak
                                         : 0;
-                                    cubit.setNotifStreak(!settings.notifStreak, currentStreak: streak);
+                                    cubit.setNotifStreak(
+                                      !settings.notifStreak,
+                                      currentStreak: streak,
+                                    );
                                   },
                                   teal: teal,
                                 ),
@@ -411,7 +520,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 iconBgMode: 'teal',
                                 label: 'Milestone Celebrations',
                                 arLabel: 'اشعارات الانجازات',
-                                rightWidget: _Toggle(on: settings.notifMilestone, onToggle: () => cubit.setNotifMilestone(!settings.notifMilestone), teal: teal),
+                                rightWidget: _Toggle(
+                                  on: settings.notifMilestone,
+                                  onToggle: () => cubit.setNotifMilestone(
+                                    !settings.notifMilestone,
+                                  ),
+                                  teal: teal,
+                                ),
                               ),
                               SettingRow(
                                 icon: Icons.vibration,
@@ -419,7 +534,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 iconBgMode: 'default',
                                 label: 'Sound & Haptics',
                                 arLabel: 'الصوت والاهتزاز',
-                                rightWidget: _Toggle(on: settings.soundEnabled, onToggle: () => cubit.setSoundEnabled(!settings.soundEnabled), teal: teal),
+                                rightWidget: _Toggle(
+                                  on: settings.soundEnabled,
+                                  onToggle: () => cubit.setSoundEnabled(
+                                    !settings.soundEnabled,
+                                  ),
+                                  teal: teal,
+                                ),
                                 isLast: true,
                               ),
                             ],
@@ -459,7 +580,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 iconBgMode: 'teal',
                                 label: 'Privacy Policy',
                                 arLabel: 'سياسة الخصوصية',
-                                rightWidget: Icon(arabic ? Icons.chevron_left : Icons.chevron_right, size: 16, color: textSecondary),
+                                rightWidget: Icon(
+                                  arabic
+                                      ? Icons.chevron_left
+                                      : Icons.chevron_right,
+                                  size: 16,
+                                  color: textSecondary,
+                                ),
                                 onTap: () => showModalBottomSheet(
                                   context: context,
                                   isScrollControlled: true,
@@ -473,10 +600,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 iconBgMode: 'gold',
                                 label: 'Rate Diyaa',
                                 arLabel: 'قيّم التطبيق',
-                                rightWidget: Icon(arabic ? Icons.chevron_left : Icons.chevron_right, size: 16, color: textSecondary),
+                                rightWidget: Icon(
+                                  arabic
+                                      ? Icons.chevron_left
+                                      : Icons.chevron_right,
+                                  size: 16,
+                                  color: textSecondary,
+                                ),
                                 onTap: () {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text(t('Thank you for your support!', 'شكراً لدعمك!')))
+                                    SnackBar(
+                                      content: Text(
+                                        t(
+                                          'Thank you for your support!',
+                                          'شكراً لدعمك!',
+                                        ),
+                                      ),
+                                    ),
                                   );
                                 },
                               ),
@@ -485,8 +625,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 iconColor: gold,
                                 iconBgMode: 'default',
                                 label: 'Diyaa v1.0.0',
-                                arLabel: ar.toArabicDigits('ضياء v1.0.0', isArabic: arabic),
-                                sublabel: t('Made with care for the Ummah', 'صُنع بعناية للأمة الإسلامية'),
+                                arLabel: ar.toArabicDigits(
+                                  'ضياء v1.0.0',
+                                  isArabic: arabic,
+                                ),
+                                sublabel: t(
+                                  'Made with care for the Ummah',
+                                  'صُنع بعناية للأمة الإسلامية',
+                                ),
                                 rightWidget: const SizedBox.shrink(),
                                 isLast: true,
                               ),
@@ -559,28 +705,34 @@ class _SalahNabiSection extends StatelessWidget {
         // Sub-options — only shown when enabled
         if (on) ...[
           // Sound picker — opens bottom sheet
-          Builder(builder: (ctx) {
-            final selected = kSalahSounds.firstWhere(
-              (s) => s.id == settings.salahSound,
-              orElse: () => kSalahSounds.first,
-            );
-            return SettingRow(
-              icon: Icons.music_note_outlined,
-              iconColor: gold,
-              iconBgMode: 'gold',
-              label: 'Reminder Sound',
-              arLabel: 'صوت التذكير',
-              sublabel: arabic ? selected.nameAr : selected.nameEn,
-              rightWidget: Icon(arabic ? Icons.chevron_left : Icons.chevron_right, size: 16, color: textSecondary),
-              onTap: () => showModalBottomSheet(
-                context: ctx,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (_) => const SoundSheet(),
-              ),
-              isLast: false,
-            );
-          }),
+          Builder(
+            builder: (ctx) {
+              final selected = kSalahSounds.firstWhere(
+                (s) => s.id == settings.salahSound,
+                orElse: () => kSalahSounds.first,
+              );
+              return SettingRow(
+                icon: Icons.music_note_outlined,
+                iconColor: gold,
+                iconBgMode: 'gold',
+                label: 'Reminder Sound',
+                arLabel: 'صوت التذكير',
+                sublabel: arabic ? selected.nameAr : selected.nameEn,
+                rightWidget: Icon(
+                  arabic ? Icons.chevron_left : Icons.chevron_right,
+                  size: 16,
+                  color: textSecondary,
+                ),
+                onTap: () => showModalBottomSheet(
+                  context: ctx,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => const SoundSheet(),
+                ),
+                isLast: false,
+              );
+            },
+          ),
 
           // Interval picker
           Padding(
@@ -616,15 +768,15 @@ class _SalahNabiSection extends StatelessWidget {
             ),
             rightWidget: _Toggle(
               on: settings.salahOverrideSilent,
-              onToggle: () => cubit.setSalahOverrideSilent(!settings.salahOverrideSilent),
+              onToggle: () =>
+                  cubit.setSalahOverrideSilent(!settings.salahOverrideSilent),
               teal: teal,
             ),
             isLast: true,
           ),
         ],
 
-        if (!on)
-          const SizedBox(height: 6),
+        if (!on) const SizedBox(height: 6),
       ],
     );
   }
@@ -689,9 +841,14 @@ class _IntervalRow extends StatelessWidget {
     final min = settings.salahInterval;
     final isArabic = settings.arabicMode;
     final label = min < 60
-        ? t('$min min', '${ar.toArabicDigits(min.toString(), isArabic: isArabic)} دقيقة')
-        : t('${min ~/ 60}h ${min % 60 != 0 ? '${min % 60}m' : ''}', 
-            '${ar.toArabicDigits((min ~/ 60).toString(), isArabic: isArabic)} ساعة ${min % 60 != 0 ? '${ar.toArabicDigits((min % 60).toString(), isArabic: isArabic)} دقيقة' : ''}');
+        ? t(
+            '$min min',
+            '${ar.toArabicDigits(min.toString(), isArabic: isArabic)} دقيقة',
+          )
+        : t(
+            '${min ~/ 60}h ${min % 60 != 0 ? '${min % 60}m' : ''}',
+            '${ar.toArabicDigits((min ~/ 60).toString(), isArabic: isArabic)} ساعة ${min % 60 != 0 ? '${ar.toArabicDigits((min % 60).toString(), isArabic: isArabic)} دقيقة' : ''}',
+          );
 
     return InkWell(
       onTap: () => _showIntervalDialog(context),
@@ -721,7 +878,9 @@ class _IntervalRow extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 Icon(
-                  settings.arabicMode ? Icons.chevron_left : Icons.chevron_right,
+                  settings.arabicMode
+                      ? Icons.chevron_left
+                      : Icons.chevron_right,
                   size: 16,
                   color: textSecondary,
                 ),
@@ -734,15 +893,21 @@ class _IntervalRow extends StatelessWidget {
   }
 
   void _showIntervalDialog(BuildContext context) {
-    final controller = TextEditingController(text: settings.salahInterval.toString());
+    final controller = TextEditingController(
+      text: settings.salahInterval.toString(),
+    );
     showDialog(
       context: context,
       builder: (ctx) {
         return Directionality(
-          textDirection: settings.arabicMode ? ui.TextDirection.rtl : ui.TextDirection.ltr,
+          textDirection: settings.arabicMode
+              ? ui.TextDirection.rtl
+              : ui.TextDirection.ltr,
           child: AlertDialog(
             backgroundColor: dark ? AppColors.bgDark : AppColors.bgLight,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             title: Text(
               t('Custom Interval', 'وقت مخصص'),
               style: TextStyle(
@@ -755,11 +920,11 @@ class _IntervalRow extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  t('Enter interval in minutes (e.g. 45 for 45 minutes)', 'أدخل الوقت بالدقائق (مثلاً 45 لمدة 45 دقيقة)'),
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: textSecondary,
+                  t(
+                    'Enter interval in minutes (e.g. 45 for 45 minutes)',
+                    'أدخل الوقت بالدقائق (مثلاً 45 لمدة 45 دقيقة)',
                   ),
+                  style: TextStyle(fontSize: 13, color: textSecondary),
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -770,7 +935,9 @@ class _IntervalRow extends StatelessWidget {
                     suffixText: t('min', 'دقيقة'),
                     suffixStyle: TextStyle(color: textSecondary),
                     filled: true,
-                    fillColor: dark ? const Color(0x11FFFFFF) : const Color(0x08000000),
+                    fillColor: dark
+                        ? const Color(0x11FFFFFF)
+                        : const Color(0x08000000),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: BorderSide.none,
@@ -782,7 +949,10 @@ class _IntervalRow extends StatelessWidget {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: Text(t('Cancel', 'إلغاء'), style: TextStyle(color: textSecondary)),
+                child: Text(
+                  t('Cancel', 'إلغاء'),
+                  style: TextStyle(color: textSecondary),
+                ),
               ),
               TextButton(
                 onPressed: () {
@@ -792,7 +962,10 @@ class _IntervalRow extends StatelessWidget {
                     Navigator.pop(ctx);
                   }
                 },
-                child: Text(t('Save', 'حفظ'), style: TextStyle(color: teal, fontWeight: FontWeight.bold)),
+                child: Text(
+                  t('Save', 'حفظ'),
+                  style: TextStyle(color: teal, fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),
@@ -814,6 +987,9 @@ class _Toggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+    final leftPos = on ? (isRtl ? 3.0 : 21.0) : (isRtl ? 21.0 : 3.0);
+
     return GestureDetector(
       onTap: onToggle,
       child: AnimatedContainer(
@@ -830,7 +1006,7 @@ class _Toggle extends StatelessWidget {
               duration: const Duration(milliseconds: 250),
               curve: Curves.easeInOut,
               top: 3,
-              left: on ? 21 : 3,
+              left: leftPos,
               child: Container(
                 width: 20,
                 height: 20,
@@ -874,10 +1050,12 @@ class _DebugNotificationsSection extends StatefulWidget {
   });
 
   @override
-  State<_DebugNotificationsSection> createState() => _DebugNotificationsSectionState();
+  State<_DebugNotificationsSection> createState() =>
+      _DebugNotificationsSectionState();
 }
 
-class _DebugNotificationsSectionState extends State<_DebugNotificationsSection> {
+class _DebugNotificationsSectionState
+    extends State<_DebugNotificationsSection> {
   bool _expanded = false;
   String? _lastSent;
 
@@ -896,7 +1074,9 @@ class _DebugNotificationsSectionState extends State<_DebugNotificationsSection> 
           duration: const Duration(seconds: 3),
           backgroundColor: widget.teal,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       );
     }
@@ -929,7 +1109,11 @@ class _DebugNotificationsSectionState extends State<_DebugNotificationsSection> 
           rightWidget: AnimatedRotation(
             turns: _expanded ? 0.5 : 0.0,
             duration: const Duration(milliseconds: 250),
-            child: Icon(Icons.keyboard_arrow_down, size: 20, color: textSecondary),
+            child: Icon(
+              Icons.keyboard_arrow_down,
+              size: 20,
+              color: textSecondary,
+            ),
           ),
           onTap: () => setState(() => _expanded = !_expanded),
           isLast: !_expanded,
@@ -945,12 +1129,19 @@ class _DebugNotificationsSectionState extends State<_DebugNotificationsSection> 
                 if (_lastSent != null)
                   Container(
                     margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
-                      color: dark ? const Color(0x144DB6AC) : const Color(0x0F0B6E6E),
+                      color: dark
+                          ? const Color(0x144DB6AC)
+                          : const Color(0x0F0B6E6E),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: dark ? const Color(0x334DB6AC) : const Color(0x260B6E6E),
+                        color: dark
+                            ? const Color(0x334DB6AC)
+                            : const Color(0x260B6E6E),
                       ),
                     ),
                     child: Row(
@@ -959,10 +1150,7 @@ class _DebugNotificationsSectionState extends State<_DebugNotificationsSection> 
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            t(
-                              'Last sent: $_lastSent',
-                              'آخر إرسال: $_lastSent',
-                            ),
+                            t('Last sent: $_lastSent', 'آخر إرسال: $_lastSent'),
                             style: TextStyle(
                               fontSize: 12,
                               color: teal,
@@ -1025,8 +1213,12 @@ class _DebugNotificationsSectionState extends State<_DebugNotificationsSection> 
                       color: teal,
                       dark: dark,
                       onTap: () {
-                        final progressState = context.read<ProgressCubit>().state;
-                        final streakVal = progressState is ProgressLoaded ? progressState.progress.streak : 0;
+                        final progressState = context
+                            .read<ProgressCubit>()
+                            .state;
+                        final streakVal = progressState is ProgressLoaded
+                            ? progressState.progress.streak
+                            : 0;
                         _fire(
                           t('Streak', 'السلسلة'),
                           () => NotificationService.sendTestStreakNotification(
@@ -1046,7 +1238,11 @@ class _DebugNotificationsSectionState extends State<_DebugNotificationsSection> 
                     'These fire immediately to verify your notification channels, icons, and sound are working correctly.',
                     'تُرسل هذه الإشعارات فوراً للتحقق من قنوات الإشعارات والأيقونات والصوت.',
                   ),
-                  style: TextStyle(fontSize: 11, color: textSecondary, height: 1.4),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: textSecondary,
+                    height: 1.4,
+                  ),
                 ),
               ],
             ),

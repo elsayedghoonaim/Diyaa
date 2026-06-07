@@ -21,7 +21,9 @@ class SettingsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settingsState = context.watch<SettingsCubit>().state;
-    final settings = settingsState is SettingsLoaded ? settingsState.settings : const SettingsModel();
+    final settings = settingsState is SettingsLoaded
+        ? settingsState.settings
+        : const SettingsModel();
     final dark = settings.darkMode;
     final arabic = settings.arabicMode;
 
@@ -47,22 +49,23 @@ class SettingsSection extends StatelessWidget {
               children: [
                 Text(
                   arabic ? ar : title.toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.0,
-                    color: teal,
-                  ),
+                  style: arabic
+                      ? GoogleFonts.amiri(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: teal,
+                          height: 1.1,
+                        )
+                      : TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.0,
+                          color: teal,
+                        ),
                 ),
                 if (!arabic) ...[
                   const SizedBox(width: 8),
-                  Text(
-                    ar,
-                    style: GoogleFonts.amiri(
-                      fontSize: 15,
-                      color: gold,
-                    ),
-                  ),
+                  Text(ar, style: GoogleFonts.amiri(fontSize: 15, color: gold)),
                 ],
               ],
             ),
@@ -73,9 +76,7 @@ class SettingsSection extends StatelessWidget {
               borderRadius: BorderRadius.circular(18),
               border: Border.all(color: border),
             ),
-            child: Column(
-              children: children,
-            ),
+            child: Column(children: children),
           ),
         ],
       ),

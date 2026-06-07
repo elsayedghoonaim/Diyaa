@@ -1,0 +1,6 @@
+and for the language icon on the settings screen I want it be expresive some how have the language to switch to
+the setting screen icon in the nav bar needs to be like a gear
+the now badge on ethe zikr in the home screen needs to be placed more suitable in Arabic and English
+verse of the day section has an arrow it points correct in the English but points the same direction on Arbic model and that's not correct make points left
+in the onbording screen make the aligment to the right if the user choose Arabic
+in the zikr screen I want the counter and the two arows for next and back a little bigger, and the progress bars at the top and at the bottom make it move from right to left with Arabic mode

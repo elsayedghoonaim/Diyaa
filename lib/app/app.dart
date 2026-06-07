@@ -25,6 +25,8 @@ import '../features/progress/presentation/manager/progress_cubit.dart';
 import '../features/onboarding/presentation/screens/onboarding_screen.dart';
 import 'main_screen.dart';
 
+import '../core/services/share_service.dart';
+
 /// Root application widget.
 /// Provides all Cubits to the widget tree and handles app lifecycle events.
 class DiyaaApp extends StatefulWidget {
@@ -66,13 +68,13 @@ class _DiyaaAppState extends State<DiyaaApp> with WidgetsBindingObserver {
       dataSource: _prayerTimesDs,
       settingsDataSource: _settingsDs,
     );
-    _azkarRepo     = AzkarRepository(dataSource: _azkarDs);
-    _progressRepo  = ProgressRepository(dataSource: _progressDs);
+    _azkarRepo = AzkarRepository(dataSource: _azkarDs);
+    _progressRepo = ProgressRepository(dataSource: _progressDs);
 
-    _settingsCubit    = SettingsCubit(repository: _settingsRepo);
+    _settingsCubit = SettingsCubit(repository: _settingsRepo);
     _prayerTimesCubit = PrayerTimesCubit(repository: _prayerTimesRepo);
-    _azkarCubit       = AzkarCubit(repository: _azkarRepo);
-    _progressCubit    = ProgressCubit(repository: _progressRepo);
+    _azkarCubit = AzkarCubit(repository: _azkarRepo);
+    _progressCubit = ProgressCubit(repository: _progressRepo);
 
     // Bootstrap: load settings first, then kick off prayer times in parallel.
     _settingsCubit.loadSettings();
@@ -95,12 +97,20 @@ class _DiyaaAppState extends State<DiyaaApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      debugPrint('[DiyaaApp] App resumed — refreshing permissions & prayer times.');
+      debugPrint(
+        '[DiyaaApp] App resumed — refreshing permissions & prayer times.',
+      );
       NotificationService.requestPermissions().catchError((e) {
         debugPrint('[DiyaaApp] requestPermissions on resume failed: $e');
       });
       _prayerTimesCubit.refreshPrayerTimes();
     } else if (state == AppLifecycleState.paused) {
+      if (ShareService.isSharing) {
+        debugPrint(
+          '[DiyaaApp] App paused during sharing — skipping launcher icon sync.',
+        );
+        return;
+      }
       debugPrint('[DiyaaApp] App paused — syncing launcher icon.');
       _settingsCubit.syncLauncherIcon();
     }
@@ -108,48 +118,57 @@ class _DiyaaAppState extends State<DiyaaApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return MultiBlocProvider(
+    return MultiRepositoryProvider(
       providers: [
-        BlocProvider<SettingsCubit>.value(value: _settingsCubit),
-        BlocProvider<PrayerTimesCubit>.value(value: _prayerTimesCubit),
-        BlocProvider<AzkarCubit>.value(value: _azkarCubit),
-        BlocProvider<ProgressCubit>.value(value: _progressCubit),
+        RepositoryProvider<SettingsRepository>.value(value: _settingsRepo),
+        RepositoryProvider<PrayerTimesRepository>.value(
+          value: _prayerTimesRepo,
+        ),
+        RepositoryProvider<AzkarRepository>.value(value: _azkarRepo),
+        RepositoryProvider<ProgressRepository>.value(value: _progressRepo),
       ],
-      child: BlocBuilder<SettingsCubit, SettingsState>(
-        builder: (context, settingsState) {
-          final isDark = settingsState is SettingsLoaded
-              ? settingsState.settings.darkMode
-              : false;
-          final textScale = settingsState is SettingsLoaded
-              ? settingsState.settings.appTextScale
-              : 0.88;
-          final onboardingComplete = settingsState is SettingsLoaded
-              ? settingsState.settings.onboardingComplete
-              : false;
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider<SettingsCubit>.value(value: _settingsCubit),
+          BlocProvider<PrayerTimesCubit>.value(value: _prayerTimesCubit),
+          BlocProvider<AzkarCubit>.value(value: _azkarCubit),
+          BlocProvider<ProgressCubit>.value(value: _progressCubit),
+        ],
+        child: BlocBuilder<SettingsCubit, SettingsState>(
+          builder: (context, settingsState) {
+            final isDark = settingsState is SettingsLoaded
+                ? settingsState.settings.darkMode
+                : false;
+            final textScale = settingsState is SettingsLoaded
+                ? settingsState.settings.appTextScale
+                : 0.88;
+            final onboardingComplete = settingsState is SettingsLoaded
+                ? settingsState.settings.onboardingComplete
+                : false;
 
-          return MaterialApp(
-            title: 'Diyaa',
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.light(),
-            darkTheme: AppTheme.dark(),
-            themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
-            builder: (context, child) {
-              final data = MediaQuery.of(context);
-              return MediaQuery(
-                data: data.copyWith(
-                  textScaler: TextScaler.linear(textScale),
-                ),
-                child: child!,
-              );
-            },
-            home: settingsState is SettingsInitial ||
-                    settingsState is SettingsLoading
-                ? const _SplashScreen()
-                : onboardingComplete
-                    ? MainScreen(key: MainScreen.mainKey)
-                    : const OnboardingScreen(),
-          );
-        },
+            return MaterialApp(
+              title: 'Diyaa',
+              debugShowCheckedModeBanner: false,
+              theme: AppTheme.light(),
+              darkTheme: AppTheme.dark(),
+              themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+              builder: (context, child) {
+                final data = MediaQuery.of(context);
+                return MediaQuery(
+                  data: data.copyWith(textScaler: TextScaler.linear(textScale)),
+                  child: child!,
+                );
+              },
+              home:
+                  settingsState is SettingsInitial ||
+                      settingsState is SettingsLoading
+                  ? const _SplashScreen()
+                  : onboardingComplete
+                  ? MainScreen(key: MainScreen.mainKey)
+                  : const OnboardingScreen(),
+            );
+          },
+        ),
       ),
     );
   }
@@ -164,9 +183,7 @@ class _SplashScreen extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.bgLight,
-      body: const Center(
-        child: CircularProgressIndicator(),
-      ),
+      body: const Center(child: CircularProgressIndicator()),
     );
   }
 }

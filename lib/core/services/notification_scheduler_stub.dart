@@ -13,6 +13,7 @@ Future<void> scheduleNotification(
   required tz.TZDateTime tzTime,
   DateTimeComponents matchComponents = DateTimeComponents.time,
   bool playSound = true, // FIX: Signature must match mobile implementation
+  bool isDarkMode = false,
 }) async {}
 
 Future<void> cancelNotification(
@@ -31,4 +32,5 @@ Future<void> showNotification(
   required String body,
   required String channelId,
   required String channelName,
+  bool isDarkMode = false,
 }) async {}

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    backup_rules.xml
+    Referenced by android:fullBackupContent in AndroidManifest.xml.
+
+    Valid domains for <full-backup-content>:
+      file, database, sharedpref, external, root,
+      device_file, device_database, device_sharedpref, device_root
+    ("cache" and "externalCache" are NOT valid — use "external" instead)
+-->
+<full-backup-content>
+
+    <!-- Exclude notification scheduling state: alarm IDs are device-specific
+         and break if restored to a different device. -->
+    <exclude domain="sharedpref" path="notification_plugin_cache.xml"/>
+
+    <!-- Exclude all external storage files (includes external cache) -->
+    <exclude domain="external" path="."/>
+
+</full-backup-content>

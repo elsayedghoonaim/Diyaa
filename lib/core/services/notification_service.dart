@@ -9,9 +9,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
-import 'notification_scheduler.dart' as scheduler;
-import 'prayer_times_service.dart';
-import 'timezone_helper.dart' as tz_helper;
+import 'package:diyaa_app/core/services/notification_scheduler.dart' as scheduler;
+import 'package:diyaa_app/core/services/prayer_times_service.dart';
+import 'package:diyaa_app/core/services/timezone_helper.dart' as tz_helper;
 
 class NotificationService {
   NotificationService._();
@@ -236,7 +236,12 @@ class NotificationService {
       // On Android 14+, SCHEDULE_EXACT_ALARM is denied by default.
       // We check exact alarm status without forcing an automatic redirection to settings,
       // which prevents infinite resume settings redirection loops.
-      final canExact = await android.canScheduleExactNotifications() ?? false;
+      bool canExact = false;
+      try {
+        canExact = await android.canScheduleExactNotifications() ?? false;
+      } catch (e) {
+        debugPrint('[Notifications] canScheduleExactNotifications failed: $e');
+      }
       debugPrint('[Notifications] Android — notif: $notif, exactAlarms: $canExact');
     }
 
@@ -273,7 +278,12 @@ class NotificationService {
     final android = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
     if (android != null) {
-      return await android.canScheduleExactNotifications() ?? false;
+      try {
+        return await android.canScheduleExactNotifications() ?? false;
+      } catch (e) {
+        debugPrint('[Notifications] canScheduleExact failed: $e');
+        return false;
+      }
     }
     return true;
   }
@@ -306,14 +316,32 @@ class NotificationService {
     // Now we only cancel the 15 IDs we actually manage, leaving Salah Nabi intact.
     await _cancelScheduleAllIds();
 
-    if (notifPrayer) await _schedulePrayerTimes(prayers, isArabic: isArabic, soundEnabled: soundEnabled);
-    if (notifAzkar)  await _scheduleAzkarReminders(prayers, isArabic: isArabic, soundEnabled: soundEnabled);
+    final prefs = await SharedPreferences.getInstance();
+    final isDarkMode = prefs.getBool('diyaa-dark-mode') ?? false;
+
+    if (notifPrayer) {
+      await _schedulePrayerTimes(
+        prayers,
+        isArabic: isArabic,
+        soundEnabled: soundEnabled,
+        isDarkMode: isDarkMode,
+      );
+    }
+    if (notifAzkar) {
+      await _scheduleAzkarReminders(
+        prayers,
+        isArabic: isArabic,
+        soundEnabled: soundEnabled,
+        isDarkMode: isDarkMode,
+      );
+    }
 
     await scheduleStreakWarning(
       enabled: notifStreak,
       isArabic: isArabic,
       currentStreak: currentStreak,
       soundEnabled: soundEnabled, // FIX: thread sound preference to streak notifications
+      isDarkMode: isDarkMode,
     );
   }
 
@@ -337,7 +365,11 @@ class NotificationService {
   // PRAYER  (IDs 10–14) — no emojis
   // ══════════════════════════════════════════════════════════════════════════
   static Future<void> _schedulePrayerTimes(
-    PrayerInfo prayers, {required bool isArabic, required bool soundEnabled}) async {
+    PrayerInfo prayers, {
+    required bool isArabic,
+    required bool soundEnabled,
+    required bool isDarkMode,
+  }) async {
     final list = [
       (id: _idPrayerBase + 0, time: prayers.fajr,    ar: 'الفجر',  en: 'Fajr'),
       (id: _idPrayerBase + 1, time: prayers.dhuhr,   ar: 'الظهر',  en: 'Dhuhr'),
@@ -355,6 +387,7 @@ class NotificationService {
             : "Time to pray. Don't forget to perform your prayer on time.",
         scheduledTime: p.time,
         soundEnabled: soundEnabled, // FIX: thread sound preference
+        isDarkMode: isDarkMode,
       );
     }
     debugPrint('[Notifications] Scheduled 5 prayer notifications.');
@@ -364,7 +397,11 @@ class NotificationService {
   // AZKAR  (IDs 20–24, 30–33) — no emojis
   // ══════════════════════════════════════════════════════════════════════════
   static Future<void> _scheduleAzkarReminders(
-    PrayerInfo prayers, {required bool isArabic, required bool soundEnabled}) async {
+    PrayerInfo prayers, {
+    required bool isArabic,
+    required bool soundEnabled,
+    required bool isDarkMode,
+  }) async {
     final list = [
       (time: prayers.fajr,    ar: 'الفجر',  en: 'Fajr'),
       (time: prayers.dhuhr,   ar: 'الظهر',  en: 'Dhuhr'),
@@ -385,6 +422,7 @@ class NotificationService {
             : 'May Allah accept your prayer! Time for post-prayer supplications.',
         scheduledTime: p.time.add(const Duration(minutes: 15)),
         soundEnabled: soundEnabled, // FIX: thread sound preference
+        isDarkMode: isDarkMode,
       );
     }
 
@@ -396,6 +434,7 @@ class NotificationService {
                       : 'Start your day with remembrance. Time for Morning Azkar.',
       scheduledTime: prayers.fajr.add(const Duration(minutes: 30)),
       soundEnabled: soundEnabled,
+      isDarkMode: isDarkMode,
     );
 
     await _schedule(
@@ -406,6 +445,7 @@ class NotificationService {
                       : 'Protect yourself until morning. Time for Evening Azkar.',
       scheduledTime: prayers.asr.add(const Duration(minutes: 30)),
       soundEnabled: soundEnabled,
+      isDarkMode: isDarkMode,
     );
 
     await _schedule(
@@ -416,6 +456,7 @@ class NotificationService {
                       : 'End your day with remembrance of Allah for peaceful sleep.',
       scheduledTime: prayers.isha.add(const Duration(minutes: 30)),
       soundEnabled: soundEnabled,
+      isDarkMode: isDarkMode,
     );
 
     await _schedule(
@@ -426,18 +467,28 @@ class NotificationService {
                       : 'The last third of the night is a time of blessing. Make dua.',
       scheduledTime: prayers.fajr.subtract(const Duration(minutes: 30)),
       soundEnabled: soundEnabled,
+      isDarkMode: isDarkMode,
     );
 
     debugPrint('[Notifications] Scheduled 9 azkar notifications.');
 
-    await _scheduleJumuahAzkar(prayers.dhuhr, isArabic: isArabic, soundEnabled: soundEnabled);
+    await _scheduleJumuahAzkar(
+      prayers.dhuhr,
+      isArabic: isArabic,
+      soundEnabled: soundEnabled,
+      isDarkMode: isDarkMode,
+    );
   }
 
   // ══════════════════════════════════════════════════════════════════════════
   // JUMU'AH  (ID 25) — no emojis
   // ══════════════════════════════════════════════════════════════════════════
   static Future<void> _scheduleJumuahAzkar(
-    DateTime dhuhrTime, {required bool isArabic, required bool soundEnabled}) async {
+    DateTime dhuhrTime, {
+    required bool isArabic,
+    required bool soundEnabled,
+    required bool isDarkMode,
+  }) async {
     var fireAt = dhuhrTime.add(const Duration(minutes: 60));
     final daysUntilFriday = (5 - fireAt.weekday + 7) % 7;
     fireAt = fireAt.add(Duration(days: daysUntilFriday == 0 ? 0 : daysUntilFriday));
@@ -460,6 +511,7 @@ class NotificationService {
         tzTime: tzTime,
         matchComponents: DateTimeComponents.dayOfWeekAndTime,
         playSound: soundEnabled, // FIX: thread sound preference
+        isDarkMode: isDarkMode,
       );
       debugPrint("[Notifications] Jumu'ah azkar scheduled for $fireAt (weekly Fri).");
     } catch (e) {
@@ -648,6 +700,7 @@ class NotificationService {
     required bool isArabic,
     required int currentStreak,
     required bool soundEnabled, // FIX: thread sound preference
+    bool? isDarkMode,
   }) async {
     if (!_isMobile) return;
     await _cancelOne(_idStreakWarning);
@@ -656,6 +709,14 @@ class NotificationService {
     final now = DateTime.now();
     var fireAt = DateTime(now.year, now.month, now.day, 21, 0);
     if (fireAt.isBefore(now)) fireAt = fireAt.add(const Duration(days: 1));
+
+    final bool resolvedDarkMode;
+    if (isDarkMode == null) {
+      final prefs = await SharedPreferences.getInstance();
+      resolvedDarkMode = prefs.getBool('diyaa-dark-mode') ?? false;
+    } else {
+      resolvedDarkMode = isDarkMode;
+    }
 
     await _schedule(
       id: _idStreakWarning,
@@ -666,27 +727,28 @@ class NotificationService {
                       : 'Your daily Azkar are waiting. Keep your streak alive!',
       scheduledTime: fireAt,
       soundEnabled: soundEnabled, // FIX: thread sound preference
+      isDarkMode: resolvedDarkMode,
     );
     debugPrint('[Notifications] Streak warning scheduled for $fireAt.');
   }
 
-  static final AudioPlayer _previewPlayer = AudioPlayer()..setReleaseMode(ReleaseMode.stop);
+  static final AudioPlayer _previewPlayer = AudioPlayer()..setReleaseMode(ReleaseMode.release);
 
   static Future<void> previewSalahSound(String soundAsset) async {
     try {
       await _previewPlayer.stop();
+      await _previewPlayer.release();
       await _previewPlayer.play(
         AssetSource('sounds/$soundAsset.mp3'),
-        mode: PlayerMode.lowLatency,
       );
-      debugPrint('[Notifications] Played preview sound: $soundAsset with lowLatency');
+      debugPrint('[Notifications] Played preview sound: $soundAsset');
     } catch (e) {
       debugPrint('[Notifications] Preview failed: $e');
     }
   }
 
   // ── Desktop/Windows Timer ──
-  static final AudioPlayer _salahPlayer = AudioPlayer();
+  static final AudioPlayer _salahPlayer = AudioPlayer()..setReleaseMode(ReleaseMode.release);
   static Timer? _desktopSalahTimer;
 
   static void _startDesktopSalahTimer(
@@ -714,6 +776,7 @@ class NotificationService {
       _desktopSalahTimer = Timer(delay, () async {
         try {
           await _salahPlayer.stop();
+          await _salahPlayer.release();
           await _salahPlayer.play(AssetSource('sounds/$soundAsset.mp3'));
           debugPrint('[Notifications] Played Salah sound on desktop: $soundAsset');
         } catch (e) {
@@ -733,26 +796,32 @@ class NotificationService {
   static Future<void> sendTestNotification({bool isArabic = false}) async {
     try {
       debugPrint('[Notifications] Sending test notification...');
+      final prefs = await SharedPreferences.getInstance();
+      final isDarkMode = prefs.getBool('diyaa-dark-mode') ?? false;
       await _plugin.show(
         id: 99,
         title: isArabic ? 'اختبار اشعارات ضياء' : 'Diyaa Notifications Test',
         body: isArabic
             ? 'الاشعارات تعمل بشكل صحيح!'
             : 'If you see this, notifications are working!',
-        notificationDetails: const NotificationDetails(
+        notificationDetails: NotificationDetails(
           android: AndroidNotificationDetails(
             _channelPrayer,
             'Prayer Times',
             importance: Importance.max,
             priority: Priority.max,
             playSound: true,
+            silent: false,
             enableVibration: true,
+            icon: isDarkMode ? '@mipmap/launcher_icon_dark' : '@mipmap/launcher_icon_light',
+            color: isDarkMode ? const Color(0xFF05070C) : const Color(0xFF0B6E6E),
           ),
-          iOS: DarwinNotificationDetails(
+          iOS: const DarwinNotificationDetails(
             presentAlert: true,
             presentBadge: true,
             presentSound: true,
           ),
+          windows: const WindowsNotificationDetails(),
         ),
       );
       debugPrint('[Notifications] Test notification sent successfully.');
@@ -771,6 +840,8 @@ class NotificationService {
     if (!_isMobile) return;
     try {
       debugPrint('[Notifications] Sending test Azkar notification...');
+      final prefs = await SharedPreferences.getInstance();
+      final isDarkMode = prefs.getBool('diyaa-dark-mode') ?? false;
       await _plugin.show(
         id: 97,
         title: isArabic ? 'اختبار: أذكار الصباح' : 'Test: Morning Azkar',
@@ -784,13 +855,17 @@ class NotificationService {
             importance: Importance.high,
             priority: Priority.high,
             playSound: soundEnabled,
+            silent: !soundEnabled,
             enableVibration: soundEnabled,
+            icon: isDarkMode ? '@mipmap/launcher_icon_dark' : '@mipmap/launcher_icon_light',
+            color: isDarkMode ? const Color(0xFF05070C) : const Color(0xFF0B6E6E),
           ),
           iOS: DarwinNotificationDetails(
             presentAlert: true,
             presentBadge: false,
             presentSound: soundEnabled,
           ),
+          windows: const WindowsNotificationDetails(),
         ),
       );
       debugPrint('[Notifications] Test Azkar notification sent.');
@@ -811,6 +886,8 @@ class NotificationService {
     try {
       debugPrint('[Notifications] Sending test Streak notification...');
       final streak = currentStreak > 0 ? currentStreak : 1;
+      final prefs = await SharedPreferences.getInstance();
+      final isDarkMode = prefs.getBool('diyaa-dark-mode') ?? false;
       await _plugin.show(
         id: 96,
         title: isArabic
@@ -826,13 +903,17 @@ class NotificationService {
             importance: Importance.defaultImportance,
             priority: Priority.defaultPriority,
             playSound: false,
+            silent: true,
             enableVibration: false,
+            icon: isDarkMode ? '@mipmap/launcher_icon_dark' : '@mipmap/launcher_icon_light',
+            color: isDarkMode ? const Color(0xFF05070C) : const Color(0xFF0B6E6E),
           ),
           iOS: const DarwinNotificationDetails(
             presentAlert: true,
             presentBadge: false,
             presentSound: false,
           ),
+          windows: const WindowsNotificationDetails(),
         ),
       );
       debugPrint('[Notifications] Test Streak notification sent.');
@@ -841,15 +922,60 @@ class NotificationService {
     }
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // TEST SCHEDULED NOTIFICATION — fires in 1 minute via zonedSchedule()
+  // ══════════════════════════════════════════════════════════════════════════
+  static Future<void> sendTestScheduledNotification({
+    bool isArabic = false,
+  }) async {
+    if (!_isMobile) return;
+    try {
+      debugPrint('[Notifications] Scheduling test notification for ~1 min from now...');
+      final fireAt = DateTime.now().add(const Duration(minutes: 1));
+      final tzTime = tz.TZDateTime.from(fireAt, tz.local);
+      final prefs = await SharedPreferences.getInstance();
+      final isDarkMode = prefs.getBool('diyaa-dark-mode') ?? false;
+
+      final canExact = await canScheduleExact();
+      await _plugin.zonedSchedule(
+        id: 95,
+        title: isArabic ? 'اختبار الجدولة — ضياء' : 'Schedule Test — Diyaa',
+        body: isArabic
+            ? 'إذا ظهر هذا، فإن الإشعارات المجدولة تعمل!'
+            : 'If you see this, scheduled notifications are working!',
+        scheduledDate: tzTime,
+        notificationDetails: NotificationDetails(
+          android: AndroidNotificationDetails(
+            _channelPrayer,
+            'Prayer Times',
+            importance: Importance.high,
+            priority: Priority.high,
+            playSound: true,
+            silent: false,
+            icon: isDarkMode ? '@mipmap/launcher_icon_dark' : '@mipmap/launcher_icon_light',
+            color: isDarkMode ? const Color(0xFF05070C) : const Color(0xFF0B6E6E),
+          ),
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+          windows: const WindowsNotificationDetails(),
+        ),
+        androidScheduleMode: canExact
+            ? AndroidScheduleMode.exactAllowWhileIdle
+            : AndroidScheduleMode.inexactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+      debugPrint('[Notifications] Test scheduled for $fireAt (tz=$tzTime). Exact: $canExact');
+    } catch (e) {
+      debugPrint('[Notifications] TEST SCHEDULED FAILED: $e');
+    }
+  }
 
   // ══════════════════════════════════════════════════════════════════════════
   // TEST SALAH NOTIFICATION
   // ══════════════════════════════════════════════════════════════════════════
-  // FIX: Cross-platform test — always plays audio directly via AudioPlayer
-  // when soundEnabled (works on ALL platforms including Windows), and also
-  // shows the notification on mobile to test the notification channel.
-  // On Windows/desktop, the notification is skipped because custom sounds
-  // aren't supported by flutter_local_notifications on those platforms.
   static Future<void> sendTestSalahNotification({
     required bool isArabic,
     required String soundAsset,
@@ -862,6 +988,7 @@ class NotificationService {
       // ── Always play audio directly via low-latency player when soundEnabled.
       if (soundEnabled) {
         await _previewPlayer.stop();
+        await _previewPlayer.release();
         await _previewPlayer.play(
           AssetSource('sounds/$soundAsset.mp3'),
           mode: PlayerMode.lowLatency,
@@ -904,10 +1031,13 @@ class NotificationService {
     required String body,
   }) async {
     if (!_isMobile) return;
+    final prefs = await SharedPreferences.getInstance();
+    final isDarkMode = prefs.getBool('diyaa-dark-mode') ?? false;
     await scheduler.showNotification(
       _plugin,
       id: 50, title: title, body: body,
       channelId: _channelStreak, channelName: 'Streak & Milestones',
+      isDarkMode: isDarkMode,
     );
     debugPrint('[Notifications] Milestone shown: $title');
   }
@@ -1011,6 +1141,7 @@ class NotificationService {
     required DateTime scheduledTime,
     DateTimeComponents matchComponents = DateTimeComponents.time,
     bool soundEnabled = true, // FIX: thread sound preference to scheduler
+    required bool isDarkMode,
   }) async {
     try {
       var fireAt = scheduledTime;
@@ -1024,6 +1155,7 @@ class NotificationService {
         title: title, body: body, tzTime: tzTime,
         matchComponents: matchComponents,
         playSound: soundEnabled, // FIX: pass sound preference to scheduler
+        isDarkMode: isDarkMode,
       );
       debugPrint('[Notifications] id=$id scheduled at $fireAt (match=$matchComponents)');
     } catch (e) {

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui show TextDirection;
 import 'package:flutter/material.dart';
@@ -16,11 +17,13 @@ import '../../../progress/presentation/manager/progress_cubit.dart';
 import '../../../prayer_times/presentation/manager/prayer_times_cubit.dart';
 import '../../../progress/presentation/screens/celebration_screen.dart';
 import '../../domain/entities/zikr.dart';
+import '../../data/repo/azkar_repository.dart';
 import '../manager/azkar_state.dart';
 import '../manager/zikr_cubit.dart';
 
 String _getEnglishCategoryName(String arName) {
-  final String normalized = arName.trim()
+  final String normalized = arName
+      .trim()
       .replaceAll('\u064B', '')
       .replaceAll('\u064C', '')
       .replaceAll('\u064D', '')
@@ -87,7 +90,8 @@ String _getEnglishCategoryName(String arName) {
     'دعاء من أصابه وسوسة في الإيمان': 'Doubt in Faith',
     'دعاء الوسوسة في الصلاة و القراءة': 'Distraction During Prayer',
     'ما يقول ويفعل من أذنب ذنبا': 'If You Commit a Sin',
-    'الدعاء حينما يقع ما لا يرضاه أو غلب على أمره': 'When Something Disliked Happens',
+    'الدعاء حينما يقع ما لا يرضاه أو غلب على أمره':
+        'When Something Disliked Happens',
     'تهنئة المولود له وجوابه': 'Congratulating for a Newborn',
     'ما يعوذ به الأولاد': 'Seeking Protection for Children',
     'فضل عيادة المريض': 'Excellence of Visiting the Sick',
@@ -133,16 +137,31 @@ double _getStandardArabicFontSize(String preference) {
   }
 }
 
-class ZikrScreen extends StatefulWidget {
+class ZikrScreen extends StatelessWidget {
   final String sessionId;
 
   const ZikrScreen({super.key, this.sessionId = '1'});
 
   @override
-  State<ZikrScreen> createState() => _ZikrScreenState();
+  Widget build(BuildContext context) {
+    return BlocProvider<ZikrCubit>(
+      create: (context) =>
+          ZikrCubit(repository: context.read<AzkarRepository>()),
+      child: _ZikrScreenContent(sessionId: sessionId),
+    );
+  }
 }
 
-class _ZikrScreenState extends State<ZikrScreen> {
+class _ZikrScreenContent extends StatefulWidget {
+  final String sessionId;
+
+  const _ZikrScreenContent({required this.sessionId});
+
+  @override
+  State<_ZikrScreenContent> createState() => _ZikrScreenContentState();
+}
+
+class _ZikrScreenContentState extends State<_ZikrScreenContent> {
   final GlobalKey _shareCardKey = GlobalKey();
   bool _isAdvancing = false;
 
@@ -150,18 +169,30 @@ class _ZikrScreenState extends State<ZikrScreen> {
   void initState() {
     super.initState();
     final prayerInfo = context.read<PrayerTimesCubit>().currentPrayerInfo;
-    context.read<ZikrCubit>().loadSession(widget.sessionId, prayerInfo: prayerInfo);
+    context.read<ZikrCubit>().loadSession(
+      widget.sessionId,
+      prayerInfo: prayerInfo,
+    );
   }
 
-  void _shareZikr(BuildContext context, AzkarSession session, int zikrIdx, SettingsModel settings) {
+  void _shareZikr(
+    BuildContext context,
+    AzkarSession session,
+    int zikrIdx,
+    SettingsModel settings,
+  ) {
     final dark = settings.darkMode;
     final arabic = settings.arabicMode;
     final zikr = session.zikrs[zikrIdx];
     final teal = dark ? AppColors.accentTealDark : AppColors.accentTealLight;
     final gold = dark ? AppColors.accentGoldDark : AppColors.accentGoldLight;
     final bg = dark ? AppColors.bgDark : AppColors.bgLight;
-    final textPrimary = dark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-    final textSec = dark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final textPrimary = dark
+        ? AppColors.textPrimaryDark
+        : AppColors.textPrimaryLight;
+    final textSec = dark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
     bool isCardDark = dark;
 
     showModalBottomSheet(
@@ -173,25 +204,34 @@ class _ZikrScreenState extends State<ZikrScreen> {
           return Container(
             decoration: BoxDecoration(
               color: bg,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-              border: Border.all(color: dark ? AppColors.borderDark : AppColors.borderLight),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(28),
+              ),
+              border: Border.all(
+                color: dark ? AppColors.borderDark : AppColors.borderLight,
+              ),
             ),
             padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 36, height: 4,
+                  width: 36,
+                  height: 4,
                   margin: const EdgeInsets.only(bottom: 20),
                   decoration: BoxDecoration(
-                    color: (dark ? AppColors.borderDark : AppColors.borderLight),
+                    color: (dark
+                        ? AppColors.borderDark
+                        : AppColors.borderLight),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
                 Text(
                   arabic ? 'مشاركة الذكر' : 'Share this Zikr',
                   style: TextStyle(
-                    fontSize: 17, fontWeight: FontWeight.w700, color: textPrimary,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: textPrimary,
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -199,10 +239,14 @@ class _ZikrScreenState extends State<ZikrScreen> {
                   margin: const EdgeInsets.only(bottom: 24),
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    color: dark ? const Color(0xFF161B22) : const Color(0xFFF0EFEA),
+                    color: dark
+                        ? const Color(0xFF161B22)
+                        : const Color(0xFFF0EFEA),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: dark ? AppColors.borderDark : AppColors.borderLight,
+                      color: dark
+                          ? AppColors.borderDark
+                          : AppColors.borderLight,
                       width: 1,
                     ),
                   ),
@@ -220,16 +264,20 @@ class _ZikrScreenState extends State<ZikrScreen> {
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             decoration: BoxDecoration(
                               color: !isCardDark
-                                  ? (dark ? const Color(0xFF2D3238) : Colors.white)
+                                  ? (dark
+                                        ? const Color(0xFF2D3238)
+                                        : Colors.white)
                                   : Colors.transparent,
                               borderRadius: BorderRadius.circular(8),
                               boxShadow: !isCardDark
                                   ? [
                                       BoxShadow(
-                                        color: Colors.black.withValues(alpha: dark ? 0.2 : 0.05),
+                                        color: Colors.black.withValues(
+                                          alpha: dark ? 0.2 : 0.05,
+                                        ),
                                         blurRadius: 4,
                                         offset: const Offset(0, 2),
-                                      )
+                                      ),
                                     ]
                                   : [],
                             ),
@@ -240,7 +288,9 @@ class _ZikrScreenState extends State<ZikrScreen> {
                                   Icons.wb_sunny_outlined,
                                   size: 16,
                                   color: !isCardDark
-                                      ? (dark ? const Color(0xFFE8E4DD) : const Color(0xFF2C302E))
+                                      ? (dark
+                                            ? const Color(0xFFE8E4DD)
+                                            : const Color(0xFF2C302E))
                                       : textSec,
                                 ),
                                 const SizedBox(width: 8),
@@ -250,7 +300,9 @@ class _ZikrScreenState extends State<ZikrScreen> {
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
                                     color: !isCardDark
-                                        ? (dark ? const Color(0xFFE8E4DD) : const Color(0xFF2C302E))
+                                        ? (dark
+                                              ? const Color(0xFFE8E4DD)
+                                              : const Color(0xFF2C302E))
                                         : textSec,
                                   ),
                                 ),
@@ -271,16 +323,20 @@ class _ZikrScreenState extends State<ZikrScreen> {
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             decoration: BoxDecoration(
                               color: isCardDark
-                                  ? (dark ? const Color(0xFF080A10) : const Color(0xFF1E2638))
+                                  ? (dark
+                                        ? const Color(0xFF080A10)
+                                        : const Color(0xFF1E2638))
                                   : Colors.transparent,
                               borderRadius: BorderRadius.circular(8),
                               boxShadow: isCardDark
                                   ? [
                                       BoxShadow(
-                                        color: Colors.black.withValues(alpha: dark ? 0.3 : 0.15),
+                                        color: Colors.black.withValues(
+                                          alpha: dark ? 0.3 : 0.15,
+                                        ),
                                         blurRadius: 4,
                                         offset: const Offset(0, 2),
-                                      )
+                                      ),
                                     ]
                                   : [],
                             ),
@@ -317,7 +373,9 @@ class _ZikrScreenState extends State<ZikrScreen> {
                   icon: Icons.text_fields_rounded,
                   color: teal,
                   label: arabic ? 'مشاركة كنص' : 'Share as Text',
-                  sublabel: arabic ? 'نص عربي منسق مع المصدر' : 'Formatted Arabic text with source',
+                  sublabel: arabic
+                      ? 'نص عربي منسق مع المصدر'
+                      : 'Formatted Arabic text with source',
                   dark: dark,
                   onTap: () async {
                     Navigator.of(sheetCtx).pop();
@@ -334,11 +392,19 @@ class _ZikrScreenState extends State<ZikrScreen> {
                   icon: Icons.image_outlined,
                   color: gold,
                   label: arabic ? 'مشاركة كصورة' : 'Share as Image',
-                  sublabel: arabic ? 'بطاقة جميلة جاهزة للنشر' : 'Beautiful branded card image',
+                  sublabel: arabic
+                      ? 'بطاقة جميلة جاهزة للنشر'
+                      : 'Beautiful branded card image',
                   dark: dark,
                   onTap: () async {
                     Navigator.of(sheetCtx).pop();
-                    _captureAndShareImage(context, session, zikr, arabic, isCardDark);
+                    _captureAndShareImage(
+                      context,
+                      session,
+                      zikr,
+                      arabic,
+                      isCardDark,
+                    );
                   },
                 ),
               ],
@@ -349,7 +415,13 @@ class _ZikrScreenState extends State<ZikrScreen> {
     );
   }
 
-  void _captureAndShareImage(BuildContext context, AzkarSession session, Zikr zikr, bool arabic, bool isCardDark) {
+  void _captureAndShareImage(
+    BuildContext context,
+    AzkarSession session,
+    Zikr zikr,
+    bool arabic,
+    bool isCardDark,
+  ) {
     final overlay = Overlay.of(context);
     late OverlayEntry entry;
     entry = OverlayEntry(
@@ -371,8 +443,15 @@ class _ZikrScreenState extends State<ZikrScreen> {
     );
     overlay.insert(entry);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await ShareService.shareAsImage(_shareCardKey);
+      await Future.delayed(const Duration(milliseconds: 150));
+      if (!context.mounted) return;
+
+      final File? file = await ShareService.captureAsFile(_shareCardKey);
       entry.remove();
+
+      if (file != null) {
+        await ShareService.shareImageFile(file);
+      }
     });
   }
 
@@ -398,12 +477,18 @@ class _ZikrScreenState extends State<ZikrScreen> {
     final dark = settings.darkMode;
     final arabic = settings.arabicMode;
     final bg = dark ? AppColors.bgDark : AppColors.bgLight;
-    final textPrimary = dark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-    final textSec = dark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final textPrimary = dark
+        ? AppColors.textPrimaryDark
+        : AppColors.textPrimaryLight;
+    final textSec = dark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
     final teal = dark ? AppColors.accentTealDark : AppColors.accentTealLight;
     final gold = dark ? AppColors.accentGoldDark : AppColors.accentGoldLight;
     final border = dark ? AppColors.borderZikrDark : AppColors.borderZikrLight;
-    final progressBg = dark ? AppColors.progressBgZikrDark : AppColors.progressBgZikrLight;
+    final progressBg = dark
+        ? AppColors.progressBgZikrDark
+        : AppColors.progressBgZikrLight;
 
     showModalBottomSheet(
       context: context,
@@ -412,40 +497,56 @@ class _ZikrScreenState extends State<ZikrScreen> {
       builder: (sheetCtx) {
         return BlocBuilder<SettingsCubit, SettingsState>(
           builder: (context, settingsState) {
-            final currentSettings = settingsState is SettingsLoaded ? settingsState.settings : settings;
+            final currentSettings = settingsState is SettingsLoaded
+                ? settingsState.settings
+                : settings;
             final activeSize = currentSettings.zikrFontSize;
             final sliderVal = _fontSizeToValue(activeSize);
 
             return Container(
               decoration: BoxDecoration(
                 color: bg,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-                border: Border.all(color: dark ? AppColors.borderDark : AppColors.borderLight),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(28),
+                ),
+                border: Border.all(
+                  color: dark ? AppColors.borderDark : AppColors.borderLight,
+                ),
               ),
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 36, height: 4,
+                    width: 36,
+                    height: 4,
                     margin: const EdgeInsets.only(bottom: 20),
                     decoration: BoxDecoration(
-                      color: (dark ? AppColors.borderDark : AppColors.borderLight),
+                      color: (dark
+                          ? AppColors.borderDark
+                          : AppColors.borderLight),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                   Text(
                     arabic ? 'حجم الخط' : 'Font Size',
                     style: TextStyle(
-                      fontSize: 17, fontWeight: FontWeight.w700, color: textPrimary,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: textPrimary,
                     ),
                   ),
                   const SizedBox(height: 24),
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 24,
+                      horizontal: 16,
+                    ),
                     decoration: BoxDecoration(
-                      color: dark ? const Color(0xFF161B22) : const Color(0xFFFBFBFA),
+                      color: dark
+                          ? const Color(0xFF161B22)
+                          : const Color(0xFFFBFBFA),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: border),
                     ),
@@ -462,11 +563,10 @@ class _ZikrScreenState extends State<ZikrScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          arabic ? 'معاينة حجم الخط المباشر' : 'Live font size preview',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: textSec,
-                          ),
+                          arabic
+                              ? 'معاينة حجم الخط المباشر'
+                              : 'Live font size preview',
+                          style: TextStyle(fontSize: 12, color: textSec),
                         ),
                       ],
                     ),
@@ -481,8 +581,12 @@ class _ZikrScreenState extends State<ZikrScreen> {
                       activeTickMarkColor: Colors.transparent,
                       inactiveTickMarkColor: Colors.transparent,
                       trackHeight: 6.0,
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10.0),
-                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 20.0),
+                      thumbShape: const RoundSliderThumbShape(
+                        enabledThumbRadius: 10.0,
+                      ),
+                      overlayShape: const RoundSliderOverlayShape(
+                        overlayRadius: 20.0,
+                      ),
                     ),
                     child: Slider(
                       value: sliderVal,
@@ -505,18 +609,27 @@ class _ZikrScreenState extends State<ZikrScreen> {
                           isActive: activeSize == 'small',
                           activeColor: gold,
                           inactiveColor: textSec,
+                          onTap: () => context
+                              .read<SettingsCubit>()
+                              .setZikrFontSize('small'),
                         ),
                         _buildFontSizeLabel(
                           label: arabic ? 'وسط' : 'Medium',
                           isActive: activeSize == 'medium',
                           activeColor: gold,
                           inactiveColor: textSec,
+                          onTap: () => context
+                              .read<SettingsCubit>()
+                              .setZikrFontSize('medium'),
                         ),
                         _buildFontSizeLabel(
                           label: arabic ? 'كبير' : 'Large',
                           isActive: activeSize == 'big',
                           activeColor: gold,
                           inactiveColor: textSec,
+                          onTap: () => context
+                              .read<SettingsCubit>()
+                              .setZikrFontSize('big'),
                         ),
                       ],
                     ),
@@ -535,13 +648,18 @@ class _ZikrScreenState extends State<ZikrScreen> {
     required bool isActive,
     required Color activeColor,
     required Color inactiveColor,
+    required VoidCallback onTap,
   }) {
-    return Text(
-      label,
-      style: TextStyle(
-        fontSize: 13,
-        fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-        color: isActive ? activeColor : inactiveColor,
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+          color: isActive ? activeColor : inactiveColor,
+        ),
       ),
     );
   }
@@ -571,18 +689,26 @@ class _ZikrScreenState extends State<ZikrScreen> {
   @override
   Widget build(BuildContext context) {
     final settingsState = context.watch<SettingsCubit>().state;
-    if (settingsState is! SettingsLoaded) return const Scaffold(body: SizedBox.shrink());
+    if (settingsState is! SettingsLoaded) {
+      return const Scaffold(body: SizedBox.shrink());
+    }
     final settings = settingsState.settings;
     final dark = settings.darkMode;
     final arabic = settings.arabicMode;
 
     final bg = dark ? AppColors.bgDark : AppColors.bgLight;
-    final textPrimary = dark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-    final textSec = dark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final textPrimary = dark
+        ? AppColors.textPrimaryDark
+        : AppColors.textPrimaryLight;
+    final textSec = dark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
     final teal = dark ? AppColors.accentTealDark : AppColors.accentTealLight;
     final gold = dark ? AppColors.accentGoldDark : AppColors.accentGoldLight;
     final border = dark ? AppColors.borderZikrDark : AppColors.borderZikrLight;
-    final progressBg = dark ? AppColors.progressBgZikrDark : AppColors.progressBgZikrLight;
+    final progressBg = dark
+        ? AppColors.progressBgZikrDark
+        : AppColors.progressBgZikrLight;
     final ringTrack = dark ? AppColors.ringTrackDark : AppColors.ringTrackLight;
     final counterBg = dark ? AppColors.counterBgDark : AppColors.counterBgLight;
     final arrowBg = dark ? AppColors.arrowBgDark : AppColors.arrowBgLight;
@@ -596,12 +722,13 @@ class _ZikrScreenState extends State<ZikrScreen> {
             final sessionNameEn = _getEnglishCategoryName(state.session.nameAr);
             Navigator.of(context).pushReplacement(
               PageRouteBuilder(
-                pageBuilder: (context, animation, secondaryAnimation) => CelebrationScreen(
-                  sessionId: state.session.id,
-                  sessionNameAr: state.session.nameAr,
-                  sessionNameEn: sessionNameEn,
-                  zikrCount: state.session.zikrs.length,
-                ),
+                pageBuilder: (context, animation, secondaryAnimation) =>
+                    CelebrationScreen(
+                      sessionId: state.session.id,
+                      sessionNameAr: state.session.nameAr,
+                      sessionNameEn: sessionNameEn,
+                      zikrCount: state.session.zikrs.length,
+                    ),
                 transitionsBuilder: (context, anim, secondaryAnim, child) {
                   return FadeTransition(opacity: anim, child: child);
                 },
@@ -619,7 +746,9 @@ class _ZikrScreenState extends State<ZikrScreen> {
                 child: BlocBuilder<ZikrCubit, ZikrState>(
                   builder: (context, state) {
                     if (state is ZikrLoading || state is ZikrInitial) {
-                      return Center(child: CircularProgressIndicator(color: teal));
+                      return Center(
+                        child: CircularProgressIndicator(color: teal),
+                      );
                     }
                     if (state is ZikrError) {
                       return Center(
@@ -634,7 +763,9 @@ class _ZikrScreenState extends State<ZikrScreen> {
                       final currentIndex = state.currentIndex;
                       final counts = state.counts;
                       final sessionNameAr = session.nameAr;
-                      final sessionNameEn = _getEnglishCategoryName(sessionNameAr);
+                      final sessionNameEn = _getEnglishCategoryName(
+                        sessionNameAr,
+                      );
                       final zikrCount = session.zikrs.length;
                       final zikr = session.zikrs[currentIndex];
 
@@ -648,8 +779,14 @@ class _ZikrScreenState extends State<ZikrScreen> {
                             nameAr: sessionNameAr,
                             nameEn: !arabic ? sessionNameEn : '',
                             onBack: () => Navigator.of(context).pop(),
-                            onShare: () => _shareZikr(context, session, currentIndex, settings),
-                            onFontSizeTap: () => _showFontSizeSheet(context, settings),
+                            onShare: () => _shareZikr(
+                              context,
+                              session,
+                              currentIndex,
+                              settings,
+                            ),
+                            onFontSizeTap: () =>
+                                _showFontSizeSheet(context, settings),
                           ),
                           const SizedBox(height: 12),
                           _ProgressBar(
@@ -672,11 +809,15 @@ class _ZikrScreenState extends State<ZikrScreen> {
                                     ),
                                     child: IntrinsicHeight(
                                       child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
                                         children: [
                                           _ZikrContent(
                                             zikr: zikr,
-                                            sessionNameEn: _getEnglishCategoryName(sessionNameAr),
+                                            sessionNameEn:
+                                                _getEnglishCategoryName(
+                                                  sessionNameAr,
+                                                ),
                                             dark: dark,
                                             arabic: arabic,
                                             teal: teal,
@@ -684,7 +825,8 @@ class _ZikrScreenState extends State<ZikrScreen> {
                                             border: border,
                                             textPrimary: textPrimary,
                                             textSec: textSec,
-                                            fontSizePreference: settings.zikrFontSize,
+                                            fontSizePreference:
+                                                settings.zikrFontSize,
                                           ),
                                         ],
                                       ),
@@ -710,9 +852,11 @@ class _ZikrScreenState extends State<ZikrScreen> {
                             progressBg: progressBg,
                             textPrimary: textPrimary,
                             onTap: () => _increment(settings, state),
-                            onPrev: () => context.read<ZikrCubit>().goToPrevious(),
+                            onPrev: () =>
+                                context.read<ZikrCubit>().goToPrevious(),
                             onNext: () => context.read<ZikrCubit>().goToNext(),
-                            onDotTap: (int i) => context.read<ZikrCubit>().goToIndex(i),
+                            onDotTap: (int i) =>
+                                context.read<ZikrCubit>().goToIndex(i),
                           ),
                         ],
                       );
@@ -767,7 +911,8 @@ class _Header extends StatelessWidget {
                 child: GestureDetector(
                   onTap: onBack,
                   child: SizedBox(
-                    width: 36, height: 36,
+                    width: 36,
+                    height: 36,
                     child: Icon(Icons.chevron_left, size: 26, color: textSec),
                   ),
                 ),
@@ -781,13 +926,21 @@ class _Header extends StatelessWidget {
                   Text(
                     nameAr,
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.amiri(fontSize: 24, color: gold, height: 1.2),
+                    style: GoogleFonts.amiri(
+                      fontSize: 24,
+                      color: gold,
+                      height: 1.2,
+                    ),
                   ),
                   if (!arabic)
                     Text(
                       nameEn,
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 12, color: textSec, letterSpacing: 0.04),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: textSec,
+                        letterSpacing: 0.04,
+                      ),
                     ),
                 ],
               ),
@@ -801,16 +954,26 @@ class _Header extends StatelessWidget {
                     GestureDetector(
                       onTap: onFontSizeTap,
                       child: SizedBox(
-                        width: 36, height: 36,
-                        child: Icon(Icons.format_size_rounded, size: 22, color: textSec),
+                        width: 36,
+                        height: 36,
+                        child: Icon(
+                          Icons.format_size_rounded,
+                          size: 22,
+                          color: textSec,
+                        ),
                       ),
                     ),
                   if (onShare != null)
                     GestureDetector(
                       onTap: onShare,
                       child: SizedBox(
-                        width: 36, height: 36,
-                        child: Icon(Icons.ios_share_rounded, size: 22, color: textSec),
+                        width: 36,
+                        height: 36,
+                        child: Icon(
+                          Icons.ios_share_rounded,
+                          size: 22,
+                          color: textSec,
+                        ),
                       ),
                     ),
                 ],
@@ -844,13 +1007,18 @@ class _ProgressBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double progress = sessionTotal > 0 ? sessionCurrent / sessionTotal : 0.0;
+    final double progress = sessionTotal > 0
+        ? sessionCurrent / sessionTotal
+        : 0.0;
     final String countLabel = ar.localise(
       'Zikr ${zikrIdx + 1} of $sessionTotal',
       'الذكر ${ar.toArabicDigits((zikrIdx + 1).toString(), isArabic: true)} من ${ar.toArabicDigits(sessionTotal.toString(), isArabic: true)}',
       isArabic: arabic,
     );
-    final String progressRatio = ar.toArabicDigits('$sessionCurrent/$sessionTotal', isArabic: arabic);
+    final String progressRatio = ar.toArabicDigits(
+      '$sessionCurrent/$sessionTotal',
+      isArabic: arabic,
+    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
@@ -875,11 +1043,19 @@ class _ProgressBar extends StatelessWidget {
             children: [
               Text(
                 countLabel,
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: textSec),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                  color: textSec,
+                ),
               ),
               Text(
                 progressRatio,
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: teal),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: teal,
+                ),
               ),
             ],
           ),
@@ -973,7 +1149,11 @@ class _ZikrContent extends StatelessWidget {
               zikr.description,
               textAlign: TextAlign.center,
               textDirection: TextDirection.rtl,
-              style: TextStyle(fontSize: 14, color: textPrimary.withValues(alpha: 0.8), height: 1.5),
+              style: TextStyle(
+                fontSize: 14,
+                color: textPrimary.withValues(alpha: 0.8),
+                height: 1.5,
+              ),
             ),
             const SizedBox(height: 16),
           ],
@@ -987,7 +1167,10 @@ class _ZikrContent extends StatelessWidget {
             child: Text(
               repeatCountText,
               style: TextStyle(
-                fontSize: 11, fontWeight: FontWeight.w600, color: gold, letterSpacing: 0.04,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: gold,
+                letterSpacing: 0.04,
               ),
             ),
           ),
@@ -1042,9 +1225,19 @@ class _InteractionZone extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool canPrev = zikrIdx > 0;
     final bool canNext = zikrIdx < zikrCount - 1;
-    final String tapLabel = ar.localise('TAP TO COUNT', 'اضغط للعد', isArabic: arabic);
-    final String currentCountLabel = ar.toArabicDigits('$count', isArabic: arabic);
-    final String totalCountLabel = ar.toArabicDigits('/ ${zikr.repeat}', isArabic: arabic);
+    final String tapLabel = ar.localise(
+      'TAP TO COUNT',
+      'اضغط للعد',
+      isArabic: arabic,
+    );
+    final String currentCountLabel = ar.toArabicDigits(
+      '$count',
+      isArabic: arabic,
+    );
+    final String totalCountLabel = ar.toArabicDigits(
+      '/ ${zikr.repeat}',
+      isArabic: arabic,
+    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
@@ -1068,7 +1261,8 @@ class _InteractionZone extends StatelessWidget {
                 GestureDetector(
                   onTap: onTap,
                   child: SizedBox(
-                    width: 126, height: 126,
+                    width: 126,
+                    height: 126,
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
@@ -1081,13 +1275,16 @@ class _InteractionZone extends StatelessWidget {
                           ),
                         ),
                         Container(
-                          width: 94, height: 94,
+                          width: 94,
+                          height: 94,
                           decoration: BoxDecoration(
                             color: counterBg,
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: dark ? 0.4 : 0.08),
+                                color: Colors.black.withValues(
+                                  alpha: dark ? 0.4 : 0.08,
+                                ),
                                 blurRadius: 20,
                                 offset: const Offset(0, 4),
                               ),
@@ -1099,8 +1296,11 @@ class _InteractionZone extends StatelessWidget {
                               Text(
                                 currentCountLabel,
                                 style: TextStyle(
-                                  fontSize: 36, fontWeight: FontWeight.w200,
-                                  color: textPrimary, height: 1.0, letterSpacing: -1,
+                                  fontSize: 36,
+                                  fontWeight: FontWeight.w200,
+                                  color: textPrimary,
+                                  height: 1.0,
+                                  letterSpacing: -1,
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -1150,8 +1350,10 @@ class _InteractionZone extends StatelessWidget {
             Text(
               tapLabel,
               style: TextStyle(
-                fontSize: 10, fontWeight: FontWeight.w600,
-                letterSpacing: 1.4, color: textSec,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1.4,
+                color: textSec,
               ),
             ),
           ],
@@ -1183,7 +1385,8 @@ class _ArrowBtn extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 38, height: 38,
+        width: 38,
+        height: 38,
         decoration: BoxDecoration(
           color: bg,
           shape: BoxShape.circle,
@@ -1200,7 +1403,11 @@ class _ArcRingPainter extends CustomPainter {
   final Color teal;
   final Color track;
 
-  const _ArcRingPainter({required this.progress, required this.teal, required this.track});
+  const _ArcRingPainter({
+    required this.progress,
+    required this.teal,
+    required this.track,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1210,8 +1417,12 @@ class _ArcRingPainter extends CustomPainter {
     final r = (size.width - strokeW * 2) / 2;
 
     canvas.drawCircle(
-      Offset(cx, cy), r,
-      Paint()..color = track..style = PaintingStyle.stroke..strokeWidth = strokeW,
+      Offset(cx, cy),
+      r,
+      Paint()
+        ..color = track
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeW,
     );
 
     final sweep = 2 * math.pi * progress.clamp(0.0, 1.0);
@@ -1249,7 +1460,10 @@ class _OrnamentalDivider extends StatelessWidget {
         children: [
           Expanded(child: _GradLine(toRight: true, color: lineColor)),
           const SizedBox(width: 10),
-          CustomPaint(size: const Size(14, 14), painter: _StarDot(color: dotColor)),
+          CustomPaint(
+            size: const Size(14, 14),
+            painter: _StarDot(color: dotColor),
+          ),
           const SizedBox(width: 10),
           Expanded(child: _GradLine(toRight: false, color: lineColor)),
         ],
@@ -1297,7 +1511,12 @@ class _StarDot extends CustomPainter {
       ..lineTo(1 * s, 7 * s)
       ..lineTo(5.8 * s, 5.8 * s)
       ..close();
-    canvas.drawPath(path, Paint()..color = color.withValues(alpha: 0.6)..style = PaintingStyle.fill);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color.withValues(alpha: 0.6)
+        ..style = PaintingStyle.fill,
+    );
   }
 
   @override
@@ -1325,8 +1544,12 @@ class _ShareOptionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final cardBg = dark ? AppColors.cardBgDark : AppColors.cardBgLight;
     final borderCol = dark ? AppColors.borderDark : AppColors.borderLight;
-    final textPri = dark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-    final textSec = dark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final textPri = dark
+        ? AppColors.textPrimaryDark
+        : AppColors.textPrimaryLight;
+    final textSec = dark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
 
     return GestureDetector(
       onTap: onTap,
@@ -1340,7 +1563,8 @@ class _ShareOptionTile extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 44, height: 44,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
@@ -1352,9 +1576,19 @@ class _ShareOptionTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: textPri)),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: textPri,
+                    ),
+                  ),
                   const SizedBox(height: 2),
-                  Text(sublabel, style: TextStyle(fontSize: 12, color: textSec)),
+                  Text(
+                    sublabel,
+                    style: TextStyle(fontSize: 12, color: textSec),
+                  ),
                 ],
               ),
             ),
