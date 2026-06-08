@@ -71,8 +71,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                     ),
                     const SizedBox(height: 30),
-                    SizedBox(
-                      width: double.infinity,
+                    Center(
                       child: Text(
                         arabic ? 'مرحباً بك في ضياء' : 'Welcome to Diyaa',
                         textAlign: TextAlign.center,
@@ -84,14 +83,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
+                    Center(
                       child: Text(
                         arabic
                             ? 'اختر لغتك ونظام الألوان المفضل'
                             : 'Choose your language and theme',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 16, color: textSecondary),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: textSecondary,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 50),

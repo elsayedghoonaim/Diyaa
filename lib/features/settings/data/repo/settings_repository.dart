@@ -20,11 +20,6 @@ class SettingsRepository {
 
   Future<SettingsModel> setDarkMode(SettingsModel current, bool value) async {
     await _dataSource.saveDarkMode(value);
-    try {
-      await appIconChannel.invokeMethod('changeIcon', {'darkMode': value});
-    } catch (e) {
-      debugPrint('[SettingsRepo] Launcher icon sync failed: $e');
-    }
     return current.copyWith(darkMode: value);
   }
 
