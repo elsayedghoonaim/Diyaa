@@ -1112,25 +1112,7 @@ class _ZikrContent extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-            decoration: BoxDecoration(
-              color: sourceBg,
-              borderRadius: BorderRadius.circular(9999),
-            ),
-            child: Text(
-              arabic ? 'حصن المسلم' : 'Hisn al-Muslim',
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8,
-                color: teal,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(height: 20),
+
           Text(
             zikr.arabic,
             textAlign: TextAlign.center,
@@ -1261,13 +1243,13 @@ class _InteractionZone extends StatelessWidget {
                 GestureDetector(
                   onTap: onTap,
                   child: SizedBox(
-                    width: 126,
-                    height: 126,
+                    width: 156,
+                    height: 156,
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
                         CustomPaint(
-                          size: const Size(126, 126),
+                          size: const Size(156, 156),
                           painter: _ArcRingPainter(
                             progress: zikr.repeat > 0 ? count / zikr.repeat : 0,
                             teal: teal,
@@ -1275,8 +1257,8 @@ class _InteractionZone extends StatelessWidget {
                           ),
                         ),
                         Container(
-                          width: 94,
-                          height: 94,
+                          width: 124,
+                          height: 124,
                           decoration: BoxDecoration(
                             color: counterBg,
                             shape: BoxShape.circle,
@@ -1296,7 +1278,7 @@ class _InteractionZone extends StatelessWidget {
                               Text(
                                 currentCountLabel,
                                 style: TextStyle(
-                                  fontSize: 36,
+                                  fontSize: 48,
                                   fontWeight: FontWeight.w200,
                                   color: textPrimary,
                                   height: 1.0,
@@ -1385,14 +1367,14 @@ class _ArrowBtn extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 38,
-        height: 38,
+        width: 48,
+        height: 48,
         decoration: BoxDecoration(
           color: bg,
           shape: BoxShape.circle,
           border: Border.all(color: border, width: 1.5),
         ),
-        child: Icon(icon, size: 20, color: color),
+        child: Icon(icon, size: 26, color: color),
       ),
     );
   }

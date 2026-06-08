@@ -17,14 +17,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final SettingsState settingsState = context.watch<SettingsCubit>().state;
-    final bool dark = settingsState is SettingsLoaded ? settingsState.settings.darkMode : false;
-    final bool arabic = settingsState is SettingsLoaded ? settingsState.settings.arabicMode : false;
+    final bool dark = settingsState is SettingsLoaded
+        ? settingsState.settings.darkMode
+        : false;
+    final bool arabic = settingsState is SettingsLoaded
+        ? settingsState.settings.arabicMode
+        : false;
     final SettingsCubit cubit = context.read<SettingsCubit>();
 
     final Color bg = dark ? AppColors.bgDark : AppColors.bgLight;
-    final Color textSecondary = dark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
-    final Color teal = dark ? AppColors.accentTealDark : AppColors.accentTealLight;
-    final Color gold = dark ? AppColors.accentGoldDark : AppColors.accentGoldLight;
+    final Color textSecondary = dark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
+    final Color teal = dark
+        ? AppColors.accentTealDark
+        : AppColors.accentTealLight;
+    final Color gold = dark
+        ? AppColors.accentGoldDark
+        : AppColors.accentGoldLight;
 
     return Directionality(
       textDirection: arabic ? TextDirection.rtl : TextDirection.ltr,
@@ -37,48 +47,60 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 30),
                 child: Column(
-                  crossAxisAlignment: arabic
-                      ? CrossAxisAlignment.end
-                      : CrossAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     const Spacer(),
-                    Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        color: gold.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: gold.withValues(alpha: 0.3),
-                          width: 2,
+                    Align(
+                      alignment: Alignment.center,
+                      child: Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: gold.withValues(alpha: 0.3),
+                            width: 2,
+                          ),
+                        ),
+                        child: ClipOval(
+                          child: Image.asset(
+                            'assets/icon.png',
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ),
-                      child: Icon(Icons.auto_awesome, size: 50, color: gold),
                     ),
                     const SizedBox(height: 30),
-                    Text(
-                      arabic ? 'مرحباً بك في ضياء' : 'Welcome to Diyaa',
-                      textAlign: arabic ? TextAlign.right : TextAlign.center,
-                      style: GoogleFonts.amiri(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: gold,
+                    SizedBox(
+                      width: double.infinity,
+                      child: Text(
+                        arabic ? 'مرحباً بك في ضياء' : 'Welcome to Diyaa',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.amiri(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: gold,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Text(
-                      arabic
-                          ? 'اختر لغتك ونظام الألوان المفضل'
-                          : 'Choose your language and theme',
-                      textAlign: arabic ? TextAlign.right : TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: textSecondary,
+                    SizedBox(
+                      width: double.infinity,
+                      child: Text(
+                        arabic
+                            ? 'اختر لغتك ونظام الألوان المفضل'
+                            : 'Choose your language and theme',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 16, color: textSecondary),
                       ),
                     ),
                     const SizedBox(height: 50),
 
-                    _buildOptionTitle(arabic ? 'اللغة' : 'Language', gold, arabic),
+                    _buildOptionTitle(
+                      arabic ? 'اللغة' : 'Language',
+                      gold,
+                      arabic,
+                    ),
                     const SizedBox(height: 15),
                     Row(
                       children: <Widget>[
@@ -105,7 +127,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                     const SizedBox(height: 40),
 
-                    _buildOptionTitle(arabic ? 'المظهر' : 'Theme', gold, arabic),
+                    _buildOptionTitle(
+                      arabic ? 'المظهر' : 'Theme',
+                      gold,
+                      arabic,
+                    ),
                     const SizedBox(height: 15),
                     Row(
                       children: <Widget>[
@@ -168,7 +194,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _buildOptionTitle(String title, Color color, bool arabic) {
     return Row(
-      mainAxisAlignment: arabic ? MainAxisAlignment.end : MainAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.start,
       children: <Widget>[
         Container(
           width: 4,
