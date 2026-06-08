@@ -893,8 +893,16 @@ class _IntervalRow extends StatelessWidget {
   }
 
   void _showIntervalDialog(BuildContext context) {
+    String toEnglishDigits(String input) {
+      const arabicDigits = '٠١٢٣٤٥٦٧٨٩';
+      for (int i = 0; i < arabicDigits.length; i++) {
+        input = input.replaceAll(arabicDigits[i], i.toString());
+      }
+      return input;
+    }
+
     final controller = TextEditingController(
-      text: settings.salahInterval.toString(),
+      text: ar.toArabicDigits(settings.salahInterval.toString(), isArabic: settings.arabicMode),
     );
     showDialog(
       context: context,
@@ -922,27 +930,51 @@ class _IntervalRow extends StatelessWidget {
                 Text(
                   t(
                     'Enter interval in minutes (e.g. 45 for 45 minutes)',
-                    'أدخل الوقت بالدقائق (مثلاً 45 لمدة 45 دقيقة)',
+                    'أدخل الوقت بالدقائق (مثلاً ٤٥ لمدة ٤٥ دقيقة)',
                   ),
                   style: TextStyle(fontSize: 13, color: textSecondary),
                 ),
                 const SizedBox(height: 16),
-                TextField(
-                  controller: controller,
-                  keyboardType: TextInputType.number,
-                  style: TextStyle(color: dark ? Colors.white : Colors.black),
-                  decoration: InputDecoration(
-                    suffixText: t('min', 'دقيقة'),
-                    suffixStyle: TextStyle(color: textSecondary),
-                    filled: true,
-                    fillColor: dark
-                        ? const Color(0x11FFFFFF)
-                        : const Color(0x08000000),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 120,
+                      child: TextField(
+                        controller: controller,
+                        keyboardType: TextInputType.number,
+                        textDirection: ui.TextDirection.ltr,
+                        textAlign: TextAlign.left,
+                        onTap: () {
+                          controller.selection = TextSelection(
+                            baseOffset: 0,
+                            extentOffset: controller.text.length,
+                          );
+                        },
+                        style: TextStyle(
+                          color: dark ? Colors.white : Colors.black,
+                          fontSize: 18,
+                          letterSpacing: 2,
+                        ),
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: dark
+                              ? const Color(0x11FFFFFF)
+                              : const Color(0x08000000),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 16),
+                    Text(
+                      t('minutes', 'دقيقة'),
+                      style: TextStyle(color: textSecondary, fontSize: 16),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -956,7 +988,8 @@ class _IntervalRow extends StatelessWidget {
               ),
               TextButton(
                 onPressed: () {
-                  final val = int.tryParse(controller.text.trim());
+                  final englishText = toEnglishDigits(controller.text.trim());
+                  final val = int.tryParse(englishText);
                   if (val != null && val > 0) {
                     cubit.setSalahInterval(val);
                     Navigator.pop(ctx);
