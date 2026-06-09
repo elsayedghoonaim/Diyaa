@@ -52,9 +52,12 @@ class MainActivity : FlutterActivity() {
                         val scheduledTime = call.argument<Long>("scheduledTime") ?: return@setMethodCallHandler result.error(
                             "INVALID_ARGS", "Missing 'scheduledTime' argument", null
                         )
-                        val soundAsset = call.argument<String>("soundAsset") ?: return@setMethodCallHandler result.error(
+                        var soundAsset = call.argument<String>("soundAsset") ?: return@setMethodCallHandler result.error(
                             "INVALID_ARGS", "Missing 'soundAsset' argument", null
                         )
+                        if (soundAsset == "salah_enhanced") {
+                            soundAsset = "salah_enhanced_v4"
+                        }
                         val overrideSilent = call.argument<Boolean>("overrideSilent") ?: false
                         val intervalMinutes = call.argument<Int>("intervalMinutes") ?: 0
 

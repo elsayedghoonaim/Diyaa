@@ -30,7 +30,10 @@ class SalahSoundReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        val soundAsset = intent.getStringExtra("soundAsset") ?: return
+        var soundAsset = intent.getStringExtra("soundAsset") ?: return
+        if (soundAsset == "salah_enhanced") {
+            soundAsset = "salah_enhanced_v4"
+        }
         val overrideSilent = intent.getBooleanExtra("overrideSilent", false)
         val alarmId = intent.getIntExtra("id", 0)
         val intervalMinutes = intent.getIntExtra("intervalMinutes", 0)

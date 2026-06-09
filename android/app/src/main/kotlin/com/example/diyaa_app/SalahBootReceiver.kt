@@ -41,7 +41,10 @@ class SalahBootReceiver : BroadcastReceiver() {
 
         if (!isEnabled) return // Salah Nabi is disabled — don't reschedule
 
-        val soundAsset = prefs.getString(KEY_SOUND_ASSET, "salah_nabi") ?: "salah_nabi"
+        var soundAsset = prefs.getString(KEY_SOUND_ASSET, "salah_nabi") ?: "salah_nabi"
+        if (soundAsset == "salah_enhanced") {
+            soundAsset = "salah_enhanced_v4"
+        }
         val overrideSilent = prefs.getBoolean(KEY_OVERRIDE_SILENT, false)
         val intervalMinutes = prefs.getInt(KEY_INTERVAL_MINUTES, 5)
 
