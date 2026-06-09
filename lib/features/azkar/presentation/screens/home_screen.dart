@@ -242,12 +242,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           const SizedBox(height: 16),
                           _buildSessionsHeader(arabic, t, teal, gold),
                           const SizedBox(height: 12),
-                          if (_isLoading)
+                          if (_isLoading || prayerState is PrayerTimesInitial || prayerState is PrayerTimesLoading)
                             const Center(
                               child: Padding(
                                 padding: EdgeInsets.all(20.0),
                                 child: CircularProgressIndicator(),
                               ),
+
                             )
                           else
                             _buildSessionCards(
