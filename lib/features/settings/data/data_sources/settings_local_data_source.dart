@@ -19,6 +19,11 @@ class SettingsLocalDataSource {
       await prefs.remove(kLongitudeKey);
       await prefs.setInt(kLocationPrefsVerKey, kLocationPrefsVersion);
     }
+    String salahSound = _readString(prefs, kSalahSoundKey, 'salah_enhanced_v4');
+    if (salahSound == 'salah_enhanced') {
+      salahSound = 'salah_enhanced_v4';
+      await prefs.setString(kSalahSoundKey, 'salah_enhanced_v4');
+    }
     return SettingsModel(
       darkMode:            _readBool(prefs, kDarkModeKey, false),
       arabicMode:          _readBool(prefs, kArabicModeKey, false),
@@ -35,7 +40,7 @@ class SettingsLocalDataSource {
       notifMilestone:      _readBool(prefs, kNotifMilestoneKey, true),
       soundEnabled:        _readBool(prefs, kSoundEnabledKey, true),
       salahNotif:          _readBool(prefs, kSalahNotifKey, false),
-      salahSound:          _readString(prefs, kSalahSoundKey, 'salah_enhanced'),
+      salahSound:          salahSound,
       salahInterval:       _readInt(prefs, kSalahIntervalKey, 60),
       salahOverrideSilent: _readBool(prefs, kSalahOverrideSilentKey, false),
       onboardingComplete:  _readBool(prefs, kOnboardingCompleteKey, false),

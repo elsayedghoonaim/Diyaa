@@ -124,9 +124,11 @@ class NotificationService {
       _channelPrayer,
       _channelAzkar,
       'diyaa_salah_salah_enhanced',
+      'diyaa_salah_salah_enhanced_v4',
       'diyaa_salah_salah_nabi',
       'diyaa_salah_silent',
       'diyaa_salah_salah_enhanced_alarm',
+      'diyaa_salah_salah_enhanced_v4_alarm',
       'diyaa_salah_salah_nabi_alarm',
     ]) {
       await android.deleteNotificationChannel(channelId: channelId);
@@ -157,11 +159,11 @@ class NotificationService {
       // without requiring USE_FULL_SCREEN_INTENT permission (which Importance.max
       // level 5 would need on Android 11+).
       const AndroidNotificationChannel(
-        'diyaa_salah_salah_enhanced', 'Al-Salah Ala Al-Nabi (Al-Naqshabandi)',
+        'diyaa_salah_salah_enhanced_v4', 'Al-Salah Ala Al-Nabi (Al-Naqshabandi)',
         description: 'Periodic Al-Salah Ala Al-Nabi sound reminders',
         importance: Importance.high,
         playSound: true,
-        sound: RawResourceAndroidNotificationSound('salah_enhanced'),
+        sound: RawResourceAndroidNotificationSound('salah_enhanced_v4'),
         enableVibration: false,
         showBadge: false,
       ),
@@ -181,12 +183,12 @@ class NotificationService {
       // The channel sound is the same as their normal counterparts, but the
       // alarm audio attribute ensures the sound plays even in DND/silent mode.
       const AndroidNotificationChannel(
-        'diyaa_salah_salah_enhanced_alarm',
+        'diyaa_salah_salah_enhanced_v4_alarm',
         'Al-Salah Ala Al-Nabi (Al-Naqshabandi) — Alarm',
         description: 'Periodic Al-Salah Ala Al-Nabi sound reminders (bypasses silent mode)',
         importance: Importance.high,
         playSound: true,
-        sound: RawResourceAndroidNotificationSound('salah_enhanced'),
+        sound: RawResourceAndroidNotificationSound('salah_enhanced_v4'),
         audioAttributesUsage: AudioAttributesUsage.alarm,
         enableVibration: false,
         showBadge: false,

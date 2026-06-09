@@ -1092,9 +1092,7 @@ class _ZikrContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sourceBg = dark
-        ? const Color(0xFF4DB6AC).withValues(alpha: 0.10)
-        : const Color(0xFF0B6E6E).withValues(alpha: 0.06);
+
     final repeatBorderColor = dark
         ? const Color(0xFFB8973A).withValues(alpha: 0.25)
         : const Color(0xFFB8973A).withValues(alpha: 0.30);

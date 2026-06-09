@@ -32,7 +32,7 @@ class SoundOption {
 // ─────────────────────────────────────────────
 const kSalahSounds = [
   SoundOption(
-    id: 'salah_enhanced',
+    id: 'salah_enhanced_v4',
     nameEn: 'Sound 1',
     nameAr: 'صوت ١',
     descEn: 'Al-Naqshabandi',

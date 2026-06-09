@@ -47,7 +47,7 @@ class SettingsModel {
     this.notifMilestone = true,
     this.soundEnabled = true,
     this.salahNotif = false,
-    this.salahSound = 'salah_enhanced',
+    this.salahSound = 'salah_enhanced_v4',
     this.salahInterval = 60,
     this.salahOverrideSilent = false,
     this.onboardingComplete = false,
